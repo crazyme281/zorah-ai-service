@@ -37,7 +37,7 @@ MODELS = {
     "together": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
     "gemini": "gemini-2.0-flash",
     "zai": "glm-4-plus",
-    "groq": "llama-3.3-70b-versatile",
+    "groq": "openai/gpt-oss-120b",
     "cohere_chat": "command-r-plus",
     "cohere_embed": "embed-english-v3.0",
     "cohere_rerank": "rerank-english-v3.0",
