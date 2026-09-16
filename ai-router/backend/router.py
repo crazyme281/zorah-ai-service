@@ -9,6 +9,7 @@ import logging
 from config import ROUTES
 from classifier import classify
 from utils.errors import RateLimitError, ProviderUnavailableError, AllProvidersFailedError
+from utils.multimodal import extract_text, has_image
 from emotion.engine import EmotionEngine
 from access.tiers import SubscriptionStore
 
@@ -34,9 +35,17 @@ TIER_GATED_PROVIDERS = {
     "groq": "can_use_groq_fast_lane",
 }
 
+# The only providers whose .chat() actually converts an image block into
+# something the model can see (see utils/multimodal.py). Every other
+# provider is OpenAI-compatible and will happily accept the same block
+# shape without erroring, but there's no guarantee the model behind it
+# is vision-capable — so a message with an attachment always tries
+# these first, regardless of what the text classifier says.
+VISION_CAPABLE = ["claude", "gemini"]
+
 
 class AIRouter:
-    def init(
+    def __init__(
         self,
         providers: dict = None,
         routes: dict = None,
@@ -86,6 +95,18 @@ class AIRouter:
             or getattr(entitlements, TIER_GATED_PROVIDERS[name])
         ]
 
+    def _build_chain(self, route, messages: list[dict], user_id: str) -> list[str]:
+        chain = [route.primary] + route.fallbacks
+        if has_image(messages):
+            # Move whichever vision-capable providers exist to the front,
+            # keeping the rest of the classified chain as a fallback in
+            # case both vision providers are down (it'll likely fail on
+            # a non-vision model, but that's the same "walk the chain
+            # and surface the real error" behavior as any other outage).
+            vision_first = [p for p in VISION_CAPABLE if p in self.providers]
+            chain = vision_first + [p for p in chain if p not in vision_first]
+        return self._filter_chain_for_tier(chain, user_id)
+
     def chat(
         self,
         messages: list[dict],
@@ -96,21 +117,24 @@ class AIRouter:
         **kwargs,
     ) -> dict:
         """
-        messages: full conversation so far, last item is the newest user turn.
+        messages: full conversation so far, last item is the newest user
+            turn. Each message's "content" is either a plain string or a
+            list of {"type": "text"|"image_url", ...} blocks (once an
+            attachment is involved) — see utils/multimodal.py.
         intent: override the classifier if you already know the route.
         persona: if True, runs the emotion engine and injects a behavioral
             directive as a system message before calling the provider.
-            Requires an EmotionEngine to have been passed to init.
+            Requires an EmotionEngine to have been passed to __init__.
         session_id: which emotional state to use/update — one per user or
             conversation thread.
         user_id: which subscriber's entitlements to enforce. If a
-            SubscriptionStore was passed to init and user_id is given,
+            SubscriptionStore was passed to __init__ and user_id is given,
             tier-gated providers (Groq) are dropped from the chain when
             this user isn't entitled to them.
         Returns {"reply": str, "provider": str, "intent": str, "attempts": [...],
                  "emotion": {...} or None}
         """
-        user_text = messages[-1]["content"] if messages else ""
+        user_text = extract_text(messages[-1]["content"]) if messages else ""
         intent = intent or self.route_for(user_text)
         route = self.routes.get(intent, self.routes["default"])
 
@@ -123,8 +147,7 @@ class AIRouter:
             call_messages = self._inject_directive(messages, directive)
             emotion_snapshot = self.emotion_engine.snapshot(session_id)
 
-        chain = [route.primary] + route.fallbacks
-        chain = self._filter_chain_for_tier(chain, user_id)
+        chain = self._build_chain(route, call_messages, user_id)
         attempts = []
 
         for provider_name in chain:

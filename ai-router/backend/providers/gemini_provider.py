@@ -1,6 +1,7 @@
 import requests
 from providers.base import BaseProvider
 from utils.errors import RateLimitError, ProviderUnavailableError
+from utils.multimodal import to_gemini_parts
 from config import API_KEYS, MODELS, REQUEST_TIMEOUT
 
 
@@ -22,7 +23,10 @@ class GeminiProvider(BaseProvider):
             if m["role"] == "system":
                 continue
             role = "model" if m["role"] == "assistant" else "user"
-            contents.append({"role": role, "parts": [{"text": m["content"]}]})
+            # to_gemini_parts handles both plain string content and a
+            # {text|image_url} block list, converting any image into
+            # inline_data base64 since Gemini can't fetch a URL itself.
+            contents.append({"role": role, "parts": to_gemini_parts(m["content"])})
 
         payload = {
             "contents": contents,

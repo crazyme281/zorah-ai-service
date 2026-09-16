@@ -1,6 +1,7 @@
 import requests
 from providers.base import BaseProvider
 from utils.errors import RateLimitError, ProviderUnavailableError
+from utils.multimodal import to_anthropic_blocks
 from config import API_KEYS, MODELS, REQUEST_TIMEOUT
 
 ENDPOINT = "https://api.anthropic.com/v1/messages"
@@ -21,7 +22,17 @@ class ClaudeProvider(BaseProvider):
         # top-level field rather than a {"role": "system"} entry inside
         # the messages list — pull any system turns out before sending.
         system_parts = [m["content"] for m in messages if m["role"] == "system"]
-        chat_messages = [m for m in messages if m["role"] != "system"]
+
+        # Content may be a plain string or a list of {text|image_url}
+        # blocks (once an attachment is involved) — to_anthropic_blocks
+        # normalizes either shape into Anthropic's block format, turning
+        # any image into a base64 `source` since Claude's public API
+        # can't fetch a URL itself.
+        chat_messages = [
+            {"role": m["role"], "content": to_anthropic_blocks(m["content"])}
+            for m in messages
+            if m["role"] != "system"
+        ]
 
         payload = {
             "model": kwargs.get("model", MODELS["claude"]),

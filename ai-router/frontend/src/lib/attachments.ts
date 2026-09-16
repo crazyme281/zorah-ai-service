@@ -1,5 +1,5 @@
 /**
- * Attachment pipeline: pick → downscale → upload → reference.
+ * Attachment pipeline: authorize → pick → downscale → upload → reference.
  *
  * Phones produce 4-12MB photos. Sending those raw is the single biggest
  * cause of a slow-feeling chat, so everything is re-encoded to a bounded
@@ -8,6 +8,8 @@
  * downscale to server-side anyway.
  */
 import { supabase } from "./supabase";
+
+const BASE = import.meta.env.VITE_AI_BACKEND_URL;
 
 export const MAX_EDGE = 1568;
 export const JPEG_QUALITY = 0.82;
@@ -25,6 +27,35 @@ export interface Attachment {
   height: number;
   bytes: number;
   name: string;
+}
+
+/**
+ * Server-side quota check — the ONLY place an image upload actually
+ * counts against the user's daily limit (see backend's
+ * POST /images/authorize + access/image_policy.py). Runs before any
+ * compression or Storage upload, so a rejected upload never burns
+ * bandwidth and never touches Storage.
+ */
+async function authorizeUpload(userId: string): Promise<void> {
+  if (!BASE) return; // backend not configured — let it through (dev/placeholder mode)
+
+  const resp = await fetch(`${BASE}/images/authorize`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: userId }),
+  });
+
+  if (resp.status === 429) {
+    const data = await resp.json().catch(() => ({}));
+    throw new Error(
+      typeof data.detail === "string"
+        ? data.detail
+        : "You've reached today's image upload limit.",
+    );
+  }
+  if (!resp.ok) {
+    throw new Error("Couldn't verify your image upload quota. Try again.");
+  }
 }
 
 function loadImage(file: File): Promise<HTMLImageElement> {
@@ -85,10 +116,13 @@ function dataUrlToBlob(dataUrl: string): Blob {
 }
 
 /**
- * Compress, then store in the `attachments` bucket under the user's own
- * folder so row-level policies can scope access by path prefix.
+ * Authorize against the daily quota, compress, then store in the
+ * `attachments` bucket under the user's own folder so row-level
+ * policies can scope access by path prefix.
  */
 export async function prepareImage(file: File, userId: string): Promise<Attachment> {
+  await authorizeUpload(userId);
+
   const { dataUrl, width, height, bytes } = await compressImage(file);
   const path = `${userId}/${crypto.randomUUID()}.jpg`;
 

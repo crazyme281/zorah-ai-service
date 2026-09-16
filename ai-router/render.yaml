@@ -22,7 +22,14 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
+      # Server-side only — subscriptions/quota (Supabase service role)
+      # and payment verification (Flutterwave secret key).
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: FLUTTERWAVE_SECRET_KEY
+        sync: false
       # Comma-separated frontend origin(s) allowed to call this API.
-      # Tighten this once the frontend has a real deployed URL.
       - key: ALLOWED_ORIGINS
         value: "*"

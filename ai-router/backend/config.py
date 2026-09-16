@@ -30,6 +30,17 @@ def missing_keys() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Server-side-only credentials for subscriptions/quota (Supabase) and
+# payment verification (Flutterwave). These must NEVER reach the
+# frontend — the service-role key in particular bypasses every RLS
+# policy in the database.
+# ---------------------------------------------------------------------------
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+FLUTTERWAVE_SECRET_KEY = os.getenv("FLUTTERWAVE_SECRET_KEY")
+
+
+# ---------------------------------------------------------------------------
 # Which model each provider should use. Keeping this separate from the key
 # means bumping a model version is a one-line change.
 # ---------------------------------------------------------------------------
