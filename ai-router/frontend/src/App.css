@@ -1,0 +1,173 @@
+.loading-page {
+  display: flex;
+}
+
+.brand-title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 20px;
+}
+
+.menu-actions {
+  padding: 4px 8px 8px;
+}
+
+.project-header-item {
+  --background: transparent;
+}
+
+.project-add-icon {
+  cursor: pointer;
+  color: var(--ion-color-step-600);
+}
+.project-add-icon:hover {
+  color: var(--ion-color-secondary);
+}
+
+.chat-list-empty {
+  --background: transparent;
+  --min-height: 32px;
+  font-size: 12.5px;
+}
+
+.chats-heading {
+  display: block;
+  padding: 10px 16px 4px;
+  font-size: 12.5px;
+  color: var(--ion-color-step-600);
+}
+.chats-heading p {
+  margin: 0;
+}
+
+.menu-footer-item {
+  --background: var(--ion-color-step-50);
+}
+
+.signout-icon {
+  cursor: pointer;
+  color: var(--ion-color-step-600);
+}
+.signout-icon:hover {
+  color: var(--ion-text-color);
+}
+
+/* ---------- Chat content ---------- */
+
+.chat-content {
+  --background: var(--ion-background-color);
+}
+
+.chat-content::part(scroll) {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message {
+  display: flex;
+}
+
+.message--user {
+  justify-content: flex-end;
+}
+
+.message--assistant {
+  justify-content: flex-start;
+}
+
+.message-bubble {
+  max-width: 68ch;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.message--user .message-bubble {
+  background: var(--ion-color-primary-shade);
+  color: var(--ion-color-primary-contrast);
+}
+
+.message--assistant .message-bubble {
+  background: var(--ion-color-step-50);
+  border: 1px solid var(--ion-color-step-150);
+  color: var(--ion-text-color);
+}
+
+.message-bubble--typing {
+  color: var(--ion-color-step-750);
+  letter-spacing: 2px;
+}
+
+.composer-toolbar {
+  --background: var(--ion-color-step-50);
+  --border-color: var(--ion-color-step-150);
+  padding: 6px 10px;
+}
+
+.composer-input {
+  --background: var(--ion-background-color);
+  --border-radius: 8px;
+  --padding-start: 12px;
+  border: 1px solid var(--ion-color-step-150);
+  border-radius: 8px;
+  margin-right: 8px;
+}
+
+/* ---------- Empty states ---------- */
+
+.empty-state {
+  margin: auto;
+  text-align: center;
+  color: var(--ion-color-step-600);
+  padding: 40px 20px;
+}
+
+.empty-state h1,
+.empty-state h2 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  color: var(--ion-text-color);
+  margin: 0 0 6px;
+}
+
+.empty-state h1 {
+  font-size: 24px;
+}
+
+.empty-state h2 {
+  font-size: 18px;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 13.5px;
+}
+
+/* ---------- Auth ---------- */
+
+.auth-content {
+  --background: var(--ion-background-color);
+}
+
+.auth-card {
+  max-width: 320px;
+  margin: 15vh auto 0;
+}
+
+.auth-brand {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 500;
+  margin-bottom: 20px;
+}
+
+.auth-input {
+  --background: var(--ion-color-step-50);
+  border: 1px solid var(--ion-color-step-150);
+  border-radius: 8px;
+  margin-bottom: 4px;
+}

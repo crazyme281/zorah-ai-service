@@ -1,0 +1,79 @@
+"""
+Central configuration for the multi-provider AI router.
+
+Everything that changes often (which model a provider uses, which
+provider handles which task, timeouts) lives here so the routing
+logic in router.py never has to change when you swap a model.
+"""
+import os
+from dataclasses import dataclass, field
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+# ---------------------------------------------------------------------------
+# API keys — pulled once, validated at startup so failures happen at boot
+# instead of mid-conversation.
+# ---------------------------------------------------------------------------
+API_KEYS = {
+    "together": os.getenv("TOGETHER_API_KEY"),
+    "gemini": os.getenv("GEMINI_API_KEY"),
+    "zai": os.getenv("ZAI_API_KEY"),
+    "cohere": os.getenv("COHERE_API_KEY"),
+    "groq": os.getenv("GROQ_API_KEY"),
+}
+
+
+def missing_keys() -> list[str]:
+    return [name for name, key in API_KEYS.items() if not key]
+
+
+# ---------------------------------------------------------------------------
+# Which model each provider should use. Keeping this separate from the key
+# means bumping a model version is a one-line change.
+# ---------------------------------------------------------------------------
+MODELS = {
+    "together": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    "gemini": "gemini-2.0-flash",
+    "zai": "glm-4-plus",
+    "groq": "llama-3.3-70b-versatile",
+    "cohere_chat": "command-r-plus",
+    "cohere_embed": "embed-english-v3.0",
+    "cohere_rerank": "rerank-english-v3.0",
+}
+
+
+# ---------------------------------------------------------------------------
+# Routing table. Each intent maps to a primary provider and an ordered
+# list of fallbacks tried in sequence if the primary errors out or is
+# rate-limited. "rag" is shaped differently since it's a two-stage
+# retrieve-then-generate pipeline, not a single chat call.
+# ---------------------------------------------------------------------------
+@dataclass
+class Route:
+    primary: str
+    fallbacks: list[str] = field(default_factory=list)
+
+
+ROUTES: dict[str, Route] = {
+    "greeting": Route(primary="together", fallbacks=["groq"]),
+    "casual": Route(primary="together", fallbacks=["groq"]),
+    "education": Route(primary="gemini", fallbacks=["groq"]),
+    "large_document": Route(primary="gemini", fallbacks=[]),
+    "coding": Route(primary="zai", fallbacks=["groq"]),
+    "agent": Route(primary="zai", fallbacks=["together", "groq"]),
+    "fast": Route(primary="groq", fallbacks=["together"]),
+    # fallback used when the classifier genuinely can't decide
+    "default": Route(primary="groq", fallbacks=["together"]),
+}
+
+RAG_ROUTE = {
+    "retrieval": "cohere",
+    "generation": "gemini",
+    "generation_fallback": "groq",
+}
+
+# Per-call timeout in seconds. A provider that hangs past this is treated
+# as failed and the router moves to the next fallback.
+REQUEST_TIMEOUT = 30
