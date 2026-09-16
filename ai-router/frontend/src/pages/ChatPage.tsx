@@ -1,147 +1,292 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   IonPage,
   IonContent,
   IonFooter,
   IonToolbar,
-  IonInput,
+  IonTextarea,
   IonIcon,
+  IonSpinner,
   useIonRouter,
 } from "@ionic/react";
-import { imageOutline, cameraOutline, micOutline, sendOutline, addOutline } from "ionicons/icons";
+import {
+  imageOutline,
+  cameraOutline,
+  micOutline,
+  sendOutline,
+  addOutline,
+  closeOutline,
+  stopOutline,
+  arrowDownOutline,
+} from "ionicons/icons";
 import { useConversations } from "../hooks/useConversations";
 import { useMessages } from "../hooks/useMessages";
 import { useAuth } from "../hooks/useAuth";
+import { useVoiceInput } from "../hooks/useVoiceInput";
+import { prepareImage, type Attachment } from "../lib/attachments";
 import { TopBar } from "../components/TopBar";
 import { ZorahLogo } from "../components/ZorahLogo";
+
+/** Treat "within this many px of the bottom" as the user following along. */
+const STICK_THRESHOLD = 120;
+const PENDING_KEY = "zorah:pending-draft";
 
 export function ChatPage() {
   const { conversationId } = useParams<{ conversationId?: string }>();
   const router = useIonRouter();
   const { user } = useAuth();
-  const { conversations, createConversation } = useConversations(user?.id);
-  const { messages, sending, sendMessage } = useMessages(conversationId ?? null);
+  const { createConversation } = useConversations(user?.id);
+  const { messages, sending, error, setError, sendMessage, stopGenerating } =
+    useMessages(conversationId ?? null);
+
   const [draft, setDraft] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [preparing, setPreparing] = useState(false);
+  const [atBottom, setAtBottom] = useState(true);
+
   const contentRef = useRef<HTMLIonContentElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+  const stickRef = useRef(true);
+
+  const voice = useVoiceInput((text) => {
+    setDraft((d) => (d ? `${d} ${text}` : text));
+  });
 
   const showWelcome = !conversationId || messages.length === 0;
 
+  /**
+   * Auto-scroll only while the user is already at the bottom. Yanking them
+   * down mid-scroll is what made long replies impossible to read back.
+   */
+  const scrollToBottom = useCallback((duration = 220) => {
+    contentRef.current?.scrollToBottom(duration);
+  }, []);
+
   useEffect(() => {
-    contentRef.current?.scrollToBottom(200);
-  }, [messages.length]);
+    if (stickRef.current) scrollToBottom(messages.length <= 1 ? 0 : 220);
+  }, [messages, scrollToBottom]);
 
-  // Typing on the welcome screen with no chat open creates one first, parks
-  // the draft, and replays it once the new chat's route has mounted — so the
-  // message never gets dropped on the floor.
-  const PENDING_KEY = "zorah:pending-draft";
+  async function handleScroll() {
+    const el = contentRef.current;
+    if (!el) return;
+    const sc = await el.getScrollElement();
+    const distance = sc.scrollHeight - sc.scrollTop - sc.clientHeight;
+    const near = distance < STICK_THRESHOLD;
+    stickRef.current = near;
+    setAtBottom(near);
+  }
 
+  // Replay a draft parked on the welcome screen once the new chat mounts.
   useEffect(() => {
     if (!conversationId) return;
     const pending = sessionStorage.getItem(PENDING_KEY);
-    if (pending) {
-      sessionStorage.removeItem(PENDING_KEY);
+    if (!pending) return;
+    sessionStorage.removeItem(PENDING_KEY);
+    try {
+      const parsed = JSON.parse(pending) as { text: string; attachments: Attachment[] };
+      sendMessage(parsed.text, parsed.attachments);
+    } catch {
       sendMessage(pending);
     }
+    // Intentionally keyed on the conversation only — this must fire once.
+     
   }, [conversationId]);
 
+  async function addFiles(files: FileList | null) {
+    if (!files?.length || !user) return;
+    setPreparing(true);
+    setError(null);
+    try {
+      const prepared: Attachment[] = [];
+      for (const file of Array.from(files).slice(0, 4)) {
+        if (!file.type.startsWith("image/")) continue;
+        prepared.push(await prepareImage(file, user.id));
+      }
+      setAttachments((prev) => [...prev, ...prepared].slice(0, 4));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't attach that image.");
+    } finally {
+      setPreparing(false);
+    }
+  }
+
   async function handleSend() {
-    if (!draft.trim() || sending) return;
+    const text = draft.trim();
+    if ((!text && attachments.length === 0) || sending || preparing) return;
+
     if (!conversationId) {
-      sessionStorage.setItem(PENDING_KEY, draft);
+      sessionStorage.setItem(PENDING_KEY, JSON.stringify({ text, attachments }));
       setDraft("");
+      setAttachments([]);
       const chat = await createConversation(null);
       if (chat) router.push(`/chat/${chat.id}`, "none", "replace");
       return;
     }
-    sendMessage(draft);
+
+    stickRef.current = true;
+    sendMessage(text, attachments);
     setDraft("");
+    setAttachments([]);
   }
+
+  const recording = voice.status === "recording";
+  const busy = sending || preparing || voice.status === "transcribing";
 
   return (
     <IonPage>
       <TopBar />
 
-      <IonContent ref={contentRef} className="chat-content" fullscreen>
-        <div className="chat-canvas-arcs" aria-hidden="true" />
+      {/* Decoration lives outside the scroll container so it stays put
+          instead of scrolling away with the messages. */}
+      <div className="chat-canvas-arcs" aria-hidden="true" />
 
-        {showWelcome && (
-          <div className="welcome">
-            <ZorahLogo size={124} variant="full" />
+      <IonContent
+        ref={contentRef}
+        className="chat-content"
+        scrollEvents
+        onIonScroll={handleScroll}
+      >
+        <div className="chat-thread">
+          {showWelcome && (
+            <div className="welcome">
+              <ZorahLogo size={124} variant="full" />
+              <h2 className="welcome__greeting">
+                Hello, I&rsquo;m Zorah <span className="spark">&#10022;</span>
+              </h2>
+              <p className="welcome__sub">
+                Ask me anything, or share an image. I&rsquo;m here to help.
+              </p>
 
-            <h2 className="welcome__greeting">
-              Hello, I&rsquo;m Zorah <span className="spark">&#10022;</span>
-            </h2>
-            <p className="welcome__sub">
-              Ask me anything, or share an image. I&rsquo;m here to help.
-            </p>
-
-            <div className="welcome__actions">
-              <button
-                type="button"
-                className="pill-action"
-                onClick={() => fileRef.current?.click()}
-              >
-                <IonIcon icon={imageOutline} />
-                <span>
-                  <b>Upload image</b>
-                  <small>JPG, PNG, WEBP</small>
-                </span>
-              </button>
-
-              <div className="welcome__divider" />
-
-              <button
-                type="button"
-                className="pill-action"
-                onClick={() => cameraRef.current?.click()}
-              >
-                <IonIcon icon={cameraOutline} />
-                <span>
-                  <b>Take photo</b>
-                  <small>Use your camera</small>
-                </span>
-              </button>
+              <div className="welcome__actions">
+                <button type="button" className="pill-action" onClick={() => fileRef.current?.click()}>
+                  <IonIcon icon={imageOutline} />
+                  <span>
+                    <b>Upload image</b>
+                    <small>JPG, PNG, WEBP</small>
+                  </span>
+                </button>
+                <div className="welcome__divider" />
+                <button type="button" className="pill-action" onClick={() => cameraRef.current?.click()}>
+                  <IonIcon icon={cameraOutline} />
+                  <span>
+                    <b>Take photo</b>
+                    <small>Use your camera</small>
+                  </span>
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {conversationId &&
-          messages.map((m) => (
-            <div key={m.id} className={`message message--${m.role}`}>
-              <div className="message-bubble">{m.content}</div>
-            </div>
-          ))}
+          {conversationId &&
+            messages.map((m) => (
+              <div key={m.id} className={`message message--${m.role}`}>
+                <div className={`message-bubble ${m.failed ? "message-bubble--failed" : ""}`}>
+                  {m.attachments.length > 0 && (
+                    <div className="message-shots">
+                      {m.attachments.map((att, i) => (
+                        <img
+                          key={i}
+                          src={att.url || att.dataUrl}
+                          alt={att.name || "Attached image"}
+                          loading="lazy"
+                        />
+                      ))}
+                    </div>
+                  )}
 
-        {sending && (
-          <div className="message message--assistant">
-            <div className="message-bubble message-bubble--typing" aria-label="Zorah is typing">
-              <i />
-              <i />
-              <i />
-            </div>
-          </div>
-        )}
+                  {m.content && <div className="message-text">{m.content}</div>}
+
+                  {m.streaming && !m.content && (
+                    <div className="typing" aria-label="Zorah is thinking">
+                      <i />
+                      <i />
+                      <i />
+                      <span>Thinking…</span>
+                    </div>
+                  )}
+
+                  {m.streaming && m.content && <span className="caret" aria-hidden="true" />}
+                </div>
+              </div>
+            ))}
+
+          {error && <div className="thread-error">{error}</div>}
+        </div>
       </IonContent>
+
+      {/* Appears only when the user has scrolled up, so they can get back. */}
+      {!atBottom && conversationId && messages.length > 0 && (
+        <button
+          type="button"
+          className="jump-bottom"
+          aria-label="Jump to latest message"
+          onClick={() => {
+            stickRef.current = true;
+            setAtBottom(true);
+            scrollToBottom();
+          }}
+        >
+          <IonIcon icon={arrowDownOutline} />
+        </button>
+      )}
 
       <IonFooter className="composer-footer ion-no-border">
         <IonToolbar>
-          <div className="composer">
+          {attachments.length > 0 && (
+            <div className="tray">
+              {attachments.map((att, i) => (
+                <div className="tray__item" key={i}>
+                  <img src={att.dataUrl || att.url} alt={att.name} />
+                  <button
+                    type="button"
+                    aria-label={`Remove ${att.name}`}
+                    onClick={() => setAttachments((prev) => prev.filter((_, j) => j !== i))}
+                  >
+                    <IonIcon icon={closeOutline} />
+                  </button>
+                </div>
+              ))}
+              {preparing && (
+                <div className="tray__item tray__item--busy">
+                  <IonSpinner name="crescent" />
+                </div>
+              )}
+            </div>
+          )}
+
+          {recording && (
+            <div className="rec-bar">
+              <span className="rec-bar__dot" />
+              Listening · {String(Math.floor(voice.seconds / 60)).padStart(2, "0")}:
+              {String(voice.seconds % 60).padStart(2, "0")}
+              {voice.interim && <em>{voice.interim}</em>}
+              <button type="button" onClick={voice.cancel}>
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {voice.error && <div className="rec-error">{voice.error}</div>}
+
+          <div className={`composer ${recording ? "composer--recording" : ""}`}>
             <button
               type="button"
               className="composer__icon composer__icon--outline"
-              aria-label="Add attachment"
+              aria-label="Attach an image"
               onClick={() => fileRef.current?.click()}
+              disabled={busy}
             >
               <IonIcon icon={addOutline} />
             </button>
 
-            <IonInput
+            <IonTextarea
               className="composer__input"
-              placeholder="Type a message…"
+              placeholder={recording ? "Listening…" : "Type a message…"}
               value={draft}
+              autoGrow
+              rows={1}
               onIonInput={(e) => setDraft(e.detail.value ?? "")}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -149,44 +294,81 @@ export function ChatPage() {
                   handleSend();
                 }
               }}
-              disabled={sending}
             />
 
             <button
               type="button"
               className="composer__icon"
-              aria-label="Attach image"
+              aria-label="Attach an image"
               onClick={() => fileRef.current?.click()}
+              disabled={busy}
             >
               <IonIcon icon={imageOutline} />
             </button>
-            <button type="button" className="composer__icon" aria-label="Voice input">
-              <IonIcon icon={micOutline} />
-            </button>
 
-            <button
-              type="button"
-              className="composer__send"
-              aria-label="Send message"
-              disabled={sending || !draft.trim()}
-              onClick={handleSend}
-            >
-              <IonIcon icon={sendOutline} />
-            </button>
+            {voice.supported && (
+              <button
+                type="button"
+                className={`composer__icon ${recording ? "composer__icon--live" : ""}`}
+                aria-label={recording ? "Stop recording" : "Record a voice message"}
+                aria-pressed={recording}
+                onClick={() => (recording ? voice.stop() : voice.start())}
+                disabled={sending || preparing}
+              >
+                {voice.status === "transcribing" ? (
+                  <IonSpinner name="crescent" />
+                ) : (
+                  <IonIcon icon={recording ? stopOutline : micOutline} />
+                )}
+              </button>
+            )}
+
+            {sending ? (
+              <button
+                type="button"
+                className="composer__send composer__send--stop"
+                aria-label="Stop generating"
+                onClick={stopGenerating}
+              >
+                <IonIcon icon={stopOutline} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="composer__send"
+                aria-label="Send message"
+                disabled={preparing || (!draft.trim() && attachments.length === 0)}
+                onClick={handleSend}
+              >
+                <IonIcon icon={sendOutline} />
+              </button>
+            )}
           </div>
         </IonToolbar>
       </IonFooter>
 
-      {/* Hidden pickers driving the upload / camera buttons. `capture` asks
-          mobile browsers and the Capacitor webview for the camera directly. */}
       <input
         ref={fileRef}
         type="file"
         accept="image/jpeg,image/png,image/webp"
+        multiple
         hidden
-        onChange={() => undefined}
+        onChange={(e) => {
+          addFiles(e.target.files);
+          e.target.value = "";
+        }}
       />
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden />
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(e) => {
+          addFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
     </IonPage>
   );
 }
