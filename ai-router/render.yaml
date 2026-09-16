@@ -12,7 +12,7 @@ services:
     envVars:
       # Provider keys - set these values in the Render dashboard
       # (Environment tab) rather than committing them here.
-      - key: TOGETHER_API_KEY
+      - key: CLAUDE_API_KEY
         sync: false
       - key: GEMINI_API_KEY
         sync: false

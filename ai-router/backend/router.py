@@ -12,7 +12,7 @@ from utils.errors import RateLimitError, ProviderUnavailableError, AllProvidersF
 from emotion.engine import EmotionEngine
 from access.tiers import SubscriptionStore
 
-from providers.together_provider import TogetherProvider
+from providers.claude_provider import ClaudeProvider
 from providers.gemini_provider import GeminiProvider
 from providers.zai_provider import ZaiProvider
 from providers.groq_provider import GroqProvider
@@ -21,7 +21,7 @@ from providers.cohere_provider import CohereProvider
 logger = logging.getLogger("ai_router")
 
 PROVIDERS = {
-    "together": TogetherProvider(),
+    "claude": ClaudeProvider(),
     "gemini": GeminiProvider(),
     "zai": ZaiProvider(),
     "groq": GroqProvider(),
@@ -36,7 +36,7 @@ TIER_GATED_PROVIDERS = {
 
 
 class AIRouter:
-    def __init__(
+    def init(
         self,
         providers: dict = None,
         routes: dict = None,
@@ -100,11 +100,11 @@ class AIRouter:
         intent: override the classifier if you already know the route.
         persona: if True, runs the emotion engine and injects a behavioral
             directive as a system message before calling the provider.
-            Requires an EmotionEngine to have been passed to __init__.
+            Requires an EmotionEngine to have been passed to init.
         session_id: which emotional state to use/update — one per user or
             conversation thread.
         user_id: which subscriber's entitlements to enforce. If a
-            SubscriptionStore was passed to __init__ and user_id is given,
+            SubscriptionStore was passed to init and user_id is given,
             tier-gated providers (Groq) are dropped from the chain when
             this user isn't entitled to them.
         Returns {"reply": str, "provider": str, "intent": str, "attempts": [...],

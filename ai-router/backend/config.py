@@ -17,7 +17,7 @@ load_dotenv()
 # instead of mid-conversation.
 # ---------------------------------------------------------------------------
 API_KEYS = {
-    "together": os.getenv("TOGETHER_API_KEY"),
+    "claude": os.getenv("CLAUDE_API_KEY"),
     "gemini": os.getenv("GEMINI_API_KEY"),
     "zai": os.getenv("ZAI_API_KEY"),
     "cohere": os.getenv("COHERE_API_KEY"),
@@ -34,7 +34,7 @@ def missing_keys() -> list[str]:
 # means bumping a model version is a one-line change.
 # ---------------------------------------------------------------------------
 MODELS = {
-    "together": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    "claude": "claude-haiku-4-5-20251001",
     "gemini": "gemini-2.0-flash",
     "zai": "glm-4-plus",
     "groq": "openai/gpt-oss-120b",
@@ -57,15 +57,15 @@ class Route:
 
 
 ROUTES: dict[str, Route] = {
-    "greeting": Route(primary="together", fallbacks=["groq"]),
-    "casual": Route(primary="together", fallbacks=["groq"]),
+    "greeting": Route(primary="claude", fallbacks=["groq"]),
+    "casual": Route(primary="claude", fallbacks=["groq"]),
     "education": Route(primary="gemini", fallbacks=["groq"]),
     "large_document": Route(primary="gemini", fallbacks=[]),
     "coding": Route(primary="zai", fallbacks=["groq"]),
-    "agent": Route(primary="zai", fallbacks=["together", "groq"]),
-    "fast": Route(primary="groq", fallbacks=["together"]),
+    "agent": Route(primary="zai", fallbacks=["claude", "groq"]),
+    "fast": Route(primary="groq", fallbacks=["claude"]),
     # fallback used when the classifier genuinely can't decide
-    "default": Route(primary="groq", fallbacks=["together"]),
+    "default": Route(primary="groq", fallbacks=["claude"]),
 }
 
 RAG_ROUTE = {
