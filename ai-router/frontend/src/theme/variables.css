@@ -1,44 +1,108 @@
 /*
- * Ionic reads color from these --ion-* variables globally, so this
- * file is the single place the app's palette lives. Same tokens as
- * the original web build, remapped onto Ionic's naming.
+ * Ionic reads colour from these --ion-* variables globally, so this file is
+ * the single place the Zorah palette lives. Two surfaces exist: the app is
+ * black-on-gold, the auth screen is a light card (see .auth-* in App.css),
+ * so a few light-surface tokens are declared here too rather than being
+ * scattered through component CSS.
  */
 :root {
-  --ion-background-color: #14161c;
-  --ion-background-color-rgb: 20, 22, 28;
-  --ion-text-color: #ece9e1;
-  --ion-text-color-rgb: 236, 233, 225;
+  /* --- Ink --- */
+  --ion-background-color: #08080a;
+  --ion-background-color-rgb: 8, 8, 10;
+  --ion-text-color: #f4efe3;
+  --ion-text-color-rgb: 244, 239, 227;
 
-  --ion-color-step-50: #1a1d25;
-  --ion-color-step-100: #21242e;
-  --ion-color-step-150: #2a2e38;
-  --ion-color-step-600: #888ea0;
-  --ion-color-step-750: #565b6b;
+  --zr-black: #08080a;
+  --zr-panel: #0d0d10;
+  --zr-rail: #050506;
+  --zr-raised: #141418;
+  --zr-line: #221f1a;
+  --zr-line-gold: rgba(214, 156, 46, 0.26);
 
-  --ion-toolbar-background: #1a1d25;
-  --ion-toolbar-border-color: #2a2e38;
+  /* --- Gold --- */
+  --zr-gold: #d69c2e;
+  --zr-gold-bright: #f2cb6b;
+  --zr-gold-pale: #fff0bc;
+  --zr-gold-deep: #8a5a10;
+  --zr-gold-ink: #1a1206;
+  --zr-gold-wash: rgba(214, 156, 46, 0.1);
+  --zr-gold-gradient: linear-gradient(135deg, #f7dc92 0%, #d69c2e 42%, #a86e13 72%, #e8bb52 100%);
+  --zr-gold-gradient-soft: linear-gradient(135deg, #2a1f0c 0%, #171308 100%);
+
+  /* --- Type colours --- */
+  --zr-text: #f4efe3;
+  --zr-text-dim: #9d968a;
+  --zr-text-faint: #6b6459;
+
+  /* --- Light surface (auth) --- */
+  --zr-paper: #f8f6f3;
+  --zr-paper-field: #fdfcfb;
+  --zr-paper-line: #e2ddd5;
+  --zr-paper-ink: #16161a;
+  --zr-paper-dim: #6f6a63;
+
+  /* --- Ionic mappings --- */
+  --ion-color-step-50: #0d0d10;
+  --ion-color-step-100: #141418;
+  --ion-color-step-150: #1c1c21;
+  --ion-color-step-600: #9d968a;
+  --ion-color-step-750: #6b6459;
+
+  --ion-toolbar-background: #08080a;
+  --ion-toolbar-border-color: var(--zr-line);
   --ion-item-background: transparent;
-  --ion-border-color: #2a2e38;
+  --ion-border-color: var(--zr-line);
 
-  /* "New chat" / active-state accent */
-  --ion-color-primary: #4fb8a6;
-  --ion-color-primary-rgb: 79, 184, 166;
-  --ion-color-primary-contrast: #14161c;
-  --ion-color-primary-contrast-rgb: 20, 22, 28;
-  --ion-color-primary-shade: #46a294;
-  --ion-color-primary-tint: #61c0af;
+  --ion-color-primary: #d69c2e;
+  --ion-color-primary-rgb: 214, 156, 46;
+  --ion-color-primary-contrast: #16110a;
+  --ion-color-primary-contrast-rgb: 22, 17, 10;
+  --ion-color-primary-shade: #bc8926;
+  --ion-color-primary-tint: #e0ab48;
 
-  /* "New project" accent */
-  --ion-color-secondary: #e3a458;
-  --ion-color-secondary-rgb: 227, 164, 88;
-  --ion-color-secondary-contrast: #14161c;
-  --ion-color-secondary-contrast-rgb: 20, 22, 28;
-  --ion-color-secondary-shade: #c8904d;
-  --ion-color-secondary-tint: #e6ad68;
+  --ion-color-secondary: #f2cb6b;
+  --ion-color-secondary-rgb: 242, 203, 107;
+  --ion-color-secondary-contrast: #16110a;
+  --ion-color-secondary-contrast-rgb: 22, 17, 10;
+  --ion-color-secondary-shade: #d5b35e;
+  --ion-color-secondary-tint: #f4d27a;
 
-  --font-display: "Fraunces", Georgia, serif;
+  /* --- Type families --- */
+  --font-display: "Outfit", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+
+  /* --- Geometry --- */
+  --zr-rail-w: 88px;
+  --zr-radius-sm: 10px;
+  --zr-radius: 14px;
+  --zr-radius-lg: 22px;
+  --zr-radius-pill: 999px;
 }
 
 body {
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
+  background: var(--zr-black);
+}
+
+/* Gold selection instead of the browser blue. */
+::selection {
+  background: rgba(214, 156, 46, 0.3);
+  color: var(--zr-gold-pale);
+}
+
+/* Keyboard focus stays visible everywhere — Ionic strips it by default. */
+:focus-visible {
+  outline: 2px solid var(--zr-gold);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

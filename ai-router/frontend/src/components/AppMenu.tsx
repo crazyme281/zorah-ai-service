@@ -1,22 +1,21 @@
 import {
   IonMenu,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
   IonContent,
   IonList,
   IonItem,
   IonLabel,
-  IonButton,
   IonIcon,
   IonAccordionGroup,
   IonAccordion,
   IonFooter,
-  IonText,
   useIonRouter,
 } from "@ionic/react";
+import { menuController } from "@ionic/core";
+import { useLocation } from "react-router-dom";
 import { addOutline, folderOutline, addCircleOutline, logOutOutline } from "ionicons/icons";
 import type { Tables } from "../lib/database.types";
+import { ZorahLogo } from "./ZorahLogo";
+import { RAIL_ITEMS, isRailActive } from "./IconRail";
 
 type Project = Tables<"projects">;
 type Conversation = Tables<"conversations">;
@@ -39,81 +38,107 @@ export function AppMenu({
   onSignOut,
 }: AppMenuProps) {
   const router = useIonRouter();
+  const { pathname } = useLocation();
   const unfiledChats = conversations.filter((c) => !c.project_id);
 
-  function goToChat(id: string) {
-    router.push(`/chat/${id}`, "forward", "push");
+  async function go(path: string) {
+    await menuController.close("app-menu");
+    router.push(path, "none", "replace");
   }
 
   return (
-    <IonMenu contentId="main-content" type="overlay" className="app-menu">
-      <IonHeader>
-        <IonToolbar>
-          <IonTitle className="brand-title">Lite</IonTitle>
-        </IonToolbar>
-      </IonHeader>
+    <IonMenu contentId="main-content" menuId="app-menu" type="overlay" className="app-menu">
+      <div className="menu-head">
+        <ZorahLogo size={34} />
+        <span className="menu-head__name">Zorah</span>
+      </div>
 
-      <IonContent className="ion-padding-top">
+      <IonContent>
         <div className="menu-actions">
-          <IonButton expand="block" fill="clear" color="primary" onClick={() => onNewChat(null)}>
-            <IonIcon icon={addOutline} slot="start" />
+          <button type="button" className="menu-btn menu-btn--gold" onClick={() => onNewChat(null)}>
+            <IonIcon icon={addOutline} />
             New chat
-          </IonButton>
-          <IonButton expand="block" fill="clear" color="secondary" onClick={onNewProject}>
-            <IonIcon icon={folderOutline} slot="start" />
+          </button>
+          <button type="button" className="menu-btn menu-btn--ghost" onClick={onNewProject}>
+            <IonIcon icon={folderOutline} />
             New project
-          </IonButton>
+          </button>
         </div>
 
-        <IonAccordionGroup multiple>
-          {projects.map((project) => {
-            const projectChats = conversations.filter((c) => c.project_id === project.id);
-            return (
-              <IonAccordion key={project.id} value={project.id}>
-                <IonItem slot="header" lines="none" className="project-header-item">
-                  <IonLabel>{project.name}</IonLabel>
-                  <IonIcon
-                    icon={addCircleOutline}
-                    slot="end"
-                    className="project-add-icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onNewChat(project.id);
-                    }}
-                  />
-                </IonItem>
-                <div className="ion-padding-start" slot="content">
-                  <IonList>
-                    {projectChats.length === 0 && (
-                      <IonItem lines="none" className="chat-list-empty">
-                        <IonLabel color="medium">No chats yet</IonLabel>
-                      </IonItem>
-                    )}
-                    {projectChats.map((chat) => (
-                      <IonItem
-                        key={chat.id}
-                        button
-                        lines="none"
-                        detail={false}
-                        onClick={() => goToChat(chat.id)}
-                      >
-                        <IonLabel className="ion-text-nowrap">{chat.title}</IonLabel>
-                      </IonItem>
-                    ))}
-                  </IonList>
-                </div>
-              </IonAccordion>
-            );
-          })}
-        </IonAccordionGroup>
+        {/* On phones the rail is hidden, so the drawer carries the sections. */}
+        <div className="menu-nav-mobile">
+          <span className="menu-section">Go to</span>
+          <IonList>
+            {RAIL_ITEMS.map((item) => (
+              <IonItem
+                key={item.path}
+                button
+                lines="none"
+                detail={false}
+                className={isRailActive(item.path, pathname) ? "chat-item--active" : ""}
+                onClick={() => go(item.path)}
+              >
+                <IonIcon icon={item.icon} slot="start" />
+                <IonLabel>{item.label}</IonLabel>
+              </IonItem>
+            ))}
+          </IonList>
+        </div>
 
-        <IonText className="chats-heading">
-          <p>Chats</p>
-        </IonText>
+        {projects.length > 0 && (
+          <>
+            <span className="menu-section">Projects</span>
+            <IonAccordionGroup multiple>
+              {projects.map((project) => {
+                const projectChats = conversations.filter((c) => c.project_id === project.id);
+                return (
+                  <IonAccordion key={project.id} value={project.id}>
+                    <IonItem slot="header" lines="none">
+                      <IonLabel>{project.name}</IonLabel>
+                      <IonIcon
+                        icon={addCircleOutline}
+                        slot="end"
+                        className="project-add-icon"
+                        aria-label={`New chat in ${project.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onNewChat(project.id);
+                        }}
+                      />
+                    </IonItem>
+                    <div className="ion-padding-start" slot="content">
+                      <IonList>
+                        {projectChats.length === 0 && (
+                          <IonItem lines="none" className="chat-list-empty">
+                            <IonLabel>No chats in here yet</IonLabel>
+                          </IonItem>
+                        )}
+                        {projectChats.map((chat) => (
+                          <IonItem
+                            key={chat.id}
+                            button
+                            lines="none"
+                            detail={false}
+                            className={pathname === `/chat/${chat.id}` ? "chat-item--active" : ""}
+                            onClick={() => go(`/chat/${chat.id}`)}
+                          >
+                            <IonLabel className="ion-text-nowrap">{chat.title}</IonLabel>
+                          </IonItem>
+                        ))}
+                      </IonList>
+                    </div>
+                  </IonAccordion>
+                );
+              })}
+            </IonAccordionGroup>
+          </>
+        )}
+
+        <span className="menu-section">Chats</span>
         <IonList>
           {unfiledChats.length === 0 && (
             <IonItem lines="none" className="chat-list-empty">
-              <IonLabel color="medium">No chats yet</IonLabel>
+              <IonLabel>Start a chat and it shows up here</IonLabel>
             </IonItem>
           )}
           {unfiledChats.map((chat) => (
@@ -122,7 +147,8 @@ export function AppMenu({
               button
               lines="none"
               detail={false}
-              onClick={() => goToChat(chat.id)}
+              className={pathname === `/chat/${chat.id}` ? "chat-item--active" : ""}
+              onClick={() => go(`/chat/${chat.id}`)}
             >
               <IonLabel className="ion-text-nowrap">{chat.title}</IonLabel>
             </IonItem>
@@ -132,10 +158,14 @@ export function AppMenu({
 
       <IonFooter className="menu-footer">
         <IonItem lines="none" className="menu-footer-item">
-          <IonLabel className="ion-text-nowrap" color="medium">
-            {userEmail}
-          </IonLabel>
-          <IonIcon icon={logOutOutline} slot="end" onClick={onSignOut} className="signout-icon" />
+          <IonLabel className="ion-text-nowrap">{userEmail}</IonLabel>
+          <IonIcon
+            icon={logOutOutline}
+            slot="end"
+            className="signout-icon"
+            aria-label="Sign out"
+            onClick={onSignOut}
+          />
         </IonItem>
       </IonFooter>
     </IonMenu>

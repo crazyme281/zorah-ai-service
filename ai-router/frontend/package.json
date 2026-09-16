@@ -10,7 +10,7 @@
     "cap:sync": "cap sync"
   },
   "dependencies": {
-    "@capacitor/android": "^6.1.2",
+    "@capacitor/android": "^6.2.2",
     "@capacitor/core": "^6.1.2",
     "@capacitor/ios": "^6.1.2",
     "@ionic/react": "^8.2.6",

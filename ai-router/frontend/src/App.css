@@ -1,71 +1,563 @@
-.loading-page {
+/* =========================================================================
+   Zorah AI — application styles
+   Order: logo · splash · shell · rail · drawer · chat · composer · auth
+   ========================================================================= */
+
+/* ---------------------------------------------------------------- Logo -- */
+
+.zorah-logo {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
 }
 
-.brand-title {
+.zorah-logo__glyph {
+  display: block;
+  filter: drop-shadow(0 6px 22px rgba(214, 156, 46, 0.22));
+}
+
+.zorah-logo__word {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.zorah-logo__name {
   font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 2.1rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  line-height: 1;
+  background: var(--zr-gold-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* Indent compensates for the trailing letter-space so the wordmark
+     optically centres under the glyph. */
+  text-indent: 0.16em;
+}
+
+.zorah-logo__rule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
   font-weight: 500;
-  font-size: 20px;
+  letter-spacing: 0.44em;
+  text-indent: 0.44em;
+  color: var(--zr-gold);
+}
+
+.zorah-logo__rule i {
+  width: 26px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--zr-gold), transparent);
+}
+
+/* -------------------------------------------------------------- Splash -- */
+
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--zr-black);
+  transition: opacity 420ms ease;
+}
+
+.splash--exiting {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.splash__body {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+  padding: 0 24px;
+}
+
+/* Soft gold bloom behind the mark. */
+.splash__glow {
+  position: absolute;
+  top: 34%;
+  left: 50%;
+  width: min(560px, 120vw);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(214, 156, 46, 0.16) 0%, transparent 62%);
+  pointer-events: none;
+}
+
+/* The arc sweeping up from the bottom-left corner. */
+.splash__sweep {
+  position: absolute;
+  left: -46%;
+  bottom: -62%;
+  width: 150%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 190deg,
+    transparent 0deg,
+    rgba(214, 156, 46, 0.5) 34deg,
+    rgba(247, 220, 146, 0.72) 48deg,
+    rgba(138, 90, 16, 0.3) 66deg,
+    transparent 92deg
+  );
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+.splash__tagline {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 1.28rem;
+  font-weight: 500;
+  line-height: 1.75;
+  color: var(--zr-text);
+}
+
+.splash__tagline span {
+  display: block;
+  background: var(--zr-gold-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* --------------------------------------------------------------- Shell -- */
+
+.app-shell {
+  display: flex;
+  height: 100%;
+  background: var(--zr-black);
+}
+
+.app-shell__main {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------------------------------------------------------------- Rail -- */
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 var(--zr-rail-w);
+  width: var(--zr-rail-w);
+  padding: 14px 0 20px;
+  gap: 6px;
+  background: var(--zr-rail);
+  border-right: 1px solid var(--zr-line);
+  padding-top: calc(14px + var(--ion-safe-area-top, 0px));
+}
+
+.rail__item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0 8px;
+  padding: 14px 4px;
+  border: 0;
+  border-radius: var(--zr-radius);
+  background: transparent;
+  color: var(--zr-text-dim);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background 160ms ease;
+}
+
+.rail__item ion-icon {
+  font-size: 23px;
+}
+
+.rail__item:hover {
+  color: var(--zr-text);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.rail__item--active {
+  color: var(--zr-gold-bright);
+  background: var(--zr-gold-wash);
+}
+
+/* Gold tab marker on the active rail item. */
+.rail__item--active::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 22%;
+  bottom: 22%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--zr-gold-gradient);
+}
+
+/* -------------------------------------------------------------- Drawer -- */
+
+.app-menu {
+  --background: var(--zr-panel);
+  --width: 288px;
+  --border: none;
+}
+
+.app-menu ion-content {
+  --background: var(--zr-panel);
+}
+
+.menu-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 18px 14px;
+  padding-top: calc(18px + var(--ion-safe-area-top, 0px));
+  border-bottom: 1px solid var(--zr-line);
+}
+
+.menu-head__name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.02rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  background: var(--zr-gold-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .menu-actions {
-  padding: 4px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 14px 10px;
 }
 
-.project-header-item {
-  --background: transparent;
-}
-
-.project-add-icon {
+/* Primary action: solid gold. Secondary: gold hairline. */
+.menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--zr-radius-sm);
+  border: 1px solid transparent;
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 600;
   cursor: pointer;
-  color: var(--ion-color-step-600);
+  transition:
+    filter 160ms ease,
+    background 160ms ease;
 }
-.project-add-icon:hover {
-  color: var(--ion-color-secondary);
+
+.menu-btn ion-icon {
+  font-size: 18px;
+}
+
+.menu-btn--gold {
+  background: var(--zr-gold-gradient);
+  color: var(--zr-gold-ink);
+}
+
+.menu-btn--gold:hover {
+  filter: brightness(1.08);
+}
+
+.menu-btn--ghost {
+  background: transparent;
+  border-color: var(--zr-line-gold);
+  color: var(--zr-gold-bright);
+}
+
+.menu-btn--ghost:hover {
+  background: var(--zr-gold-wash);
+}
+
+.menu-section {
+  display: block;
+  padding: 16px 18px 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--zr-text-faint);
+}
+
+.app-menu ion-item {
+  --background: transparent;
+  --background-hover: rgba(214, 156, 46, 0.07);
+  --color: var(--zr-text-dim);
+  --min-height: 42px;
+  --padding-start: 18px;
+  --inner-padding-end: 12px;
+  font-size: 0.875rem;
+}
+
+.app-menu ion-item.chat-item--active {
+  --background: var(--zr-gold-wash);
+  --color: var(--zr-gold-bright);
+}
+
+.project-add-icon,
+.signout-icon {
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--zr-text-faint);
+  transition: color 140ms ease;
+}
+
+.project-add-icon:hover,
+.signout-icon:hover {
+  color: var(--zr-gold-bright);
 }
 
 .chat-list-empty {
-  --background: transparent;
   --min-height: 32px;
-  font-size: 12.5px;
+  font-size: 0.78rem;
+  color: var(--zr-text-faint);
 }
 
-.chats-heading {
-  display: block;
-  padding: 10px 16px 4px;
-  font-size: 12.5px;
-  color: var(--ion-color-step-600);
-}
-.chats-heading p {
-  margin: 0;
+.menu-footer {
+  border-top: 1px solid var(--zr-line);
+  background: var(--zr-rail);
 }
 
 .menu-footer-item {
-  --background: var(--ion-color-step-50);
+  --background: transparent;
+  --min-height: 58px;
+  font-size: 0.8rem;
 }
 
-.signout-icon {
+/* ---------------------------------------------------------------- Chat -- */
+
+.zr-toolbar {
+  --background: var(--zr-black);
+  --border-color: var(--zr-line);
+  --color: var(--zr-text);
+  --min-height: 60px;
+}
+
+.zr-toolbar ion-menu-button,
+.zr-toolbar ion-button {
+  --color: var(--zr-text);
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.topbar-brand__name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.98rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  background: var(--zr-gold-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: 10px;
+  padding: 6px 14px;
+  border-radius: var(--zr-radius-pill);
+  border: 1px solid var(--zr-line-gold);
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 0.78rem;
+  color: var(--zr-text-dim);
+}
+
+.status-pill__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3ddc7f;
+  box-shadow: 0 0 8px rgba(61, 220, 127, 0.7);
+}
+
+.avatar-btn {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  margin-right: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--zr-line-gold);
+  background: transparent;
+  color: var(--zr-gold-bright);
   cursor: pointer;
-  color: var(--ion-color-step-600);
-}
-.signout-icon:hover {
-  color: var(--ion-text-color);
 }
 
-/* ---------- Chat content ---------- */
+.avatar-btn ion-icon {
+  font-size: 19px;
+}
 
 .chat-content {
-  --background: var(--ion-background-color);
+  --background: var(--zr-black);
 }
 
 .chat-content::part(scroll) {
-  padding: 20px 24px;
+  padding: 24px 22px 8px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
+/* The two gold arcs bleeding in from opposite corners of the chat canvas. */
+.chat-canvas-arcs {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.chat-canvas-arcs::before,
+.chat-canvas-arcs::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 200deg,
+    transparent 0deg,
+    rgba(214, 156, 46, 0.42) 30deg,
+    rgba(247, 220, 146, 0.6) 44deg,
+    rgba(138, 90, 16, 0.22) 62deg,
+    transparent 86deg
+  );
+}
+
+.chat-canvas-arcs::before {
+  top: -78%;
+  right: -34%;
+  width: 92%;
+  aspect-ratio: 1;
+  transform: rotate(158deg);
+}
+
+.chat-canvas-arcs::after {
+  bottom: -70%;
+  left: -40%;
+  width: 108%;
+  aspect-ratio: 1;
+}
+
+/* ------------------------------------------------------- Chat: welcome -- */
+
+.welcome {
+  position: relative;
+  z-index: 1;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 24px 16px 40px;
+}
+
+.welcome__greeting {
+  margin: 34px 0 10px;
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 4.4vw, 2.05rem);
+  font-weight: 600;
+  color: var(--zr-text);
+}
+
+.welcome__greeting .spark {
+  color: var(--zr-gold-bright);
+}
+
+.welcome__sub {
+  margin: 0;
+  max-width: 40ch;
+  font-size: 0.97rem;
+  line-height: 1.6;
+  color: var(--zr-text-dim);
+}
+
+.welcome__actions {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  margin-top: 30px;
+}
+
+.welcome__divider {
+  width: 1px;
+  margin: 8px 12px;
+  background: var(--zr-line-gold);
+}
+
+.pill-action {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 14px 24px;
+  border-radius: var(--zr-radius-pill);
+  border: 1px solid var(--zr-line-gold);
+  background: rgba(255, 255, 255, 0.015);
+  color: var(--zr-text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.pill-action:hover {
+  border-color: rgba(214, 156, 46, 0.6);
+  background: var(--zr-gold-wash);
+}
+
+.pill-action ion-icon {
+  font-size: 21px;
+  color: var(--zr-gold-bright);
+}
+
+.pill-action b {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.pill-action small {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: var(--zr-text-faint);
+}
+
+/* ------------------------------------------------------ Chat: messages -- */
+
 .message {
+  position: relative;
+  z-index: 1;
   display: flex;
 }
 
@@ -78,96 +570,541 @@
 }
 
 .message-bubble {
-  max-width: 68ch;
-  padding: 10px 14px;
-  border-radius: 10px;
-  font-size: 14.5px;
-  line-height: 1.55;
+  max-width: min(68ch, 80%);
+  padding: 13px 17px;
+  font-size: 0.93rem;
+  line-height: 1.62;
   white-space: pre-wrap;
 }
 
 .message--user .message-bubble {
-  background: var(--ion-color-primary-shade);
-  color: var(--ion-color-primary-contrast);
+  border-radius: var(--zr-radius-lg) var(--zr-radius-lg) 5px var(--zr-radius-lg);
+  background: var(--zr-gold-gradient);
+  color: var(--zr-gold-ink);
+  font-weight: 500;
 }
 
 .message--assistant .message-bubble {
-  background: var(--ion-color-step-50);
-  border: 1px solid var(--ion-color-step-150);
-  color: var(--ion-text-color);
+  border-radius: var(--zr-radius-lg) var(--zr-radius-lg) var(--zr-radius-lg) 5px;
+  background: var(--zr-raised);
+  border: 1px solid var(--zr-line);
+  color: var(--zr-text);
 }
 
 .message-bubble--typing {
-  color: var(--ion-color-step-750);
-  letter-spacing: 2px;
+  display: flex;
+  gap: 5px;
+  padding: 17px;
 }
 
-.composer-toolbar {
-  --background: var(--ion-color-step-50);
-  --border-color: var(--ion-color-step-150);
-  padding: 6px 10px;
+.message-bubble--typing i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--zr-gold);
+  animation: zr-blink 1.3s infinite ease-in-out;
 }
 
-.composer-input {
-  --background: var(--ion-background-color);
-  --border-radius: 8px;
-  --padding-start: 12px;
-  border: 1px solid var(--ion-color-step-150);
-  border-radius: 8px;
-  margin-right: 8px;
+.message-bubble--typing i:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.message-bubble--typing i:nth-child(3) {
+  animation-delay: 0.36s;
 }
 
-/* ---------- Empty states ---------- */
+@keyframes zr-blink {
+  0%,
+  70%,
+  100% {
+    opacity: 0.25;
+  }
+  35% {
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------ Composer -- */
+
+.composer-footer {
+  background: var(--zr-black);
+}
+
+.composer-footer ion-toolbar {
+  --background: var(--zr-black);
+  --border-width: 0;
+  --padding-start: 14px;
+  --padding-end: 14px;
+  --padding-top: 8px;
+  --padding-bottom: 12px;
+}
+
+.composer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 7px 7px 10px;
+  border-radius: var(--zr-radius-pill);
+  border: 1px solid var(--zr-line);
+  background: var(--zr-panel);
+}
+
+.composer__input {
+  --background: transparent;
+  --color: var(--zr-text);
+  --placeholder-color: var(--zr-text-faint);
+  --placeholder-opacity: 1;
+  --padding-start: 6px;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.93rem;
+}
+
+.composer__icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--zr-text-dim);
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background 140ms ease;
+}
+
+.composer__icon:hover {
+  color: var(--zr-gold-bright);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.composer__icon ion-icon {
+  font-size: 20px;
+}
+
+.composer__icon--outline {
+  border: 1px solid var(--zr-line-gold);
+  color: var(--zr-gold-bright);
+}
+
+.composer__send {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--zr-gold-gradient);
+  color: var(--zr-gold-ink);
+  cursor: pointer;
+  transition:
+    filter 160ms ease,
+    opacity 160ms ease;
+}
+
+.composer__send ion-icon {
+  font-size: 19px;
+}
+
+.composer__send:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.composer__send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* -------------------------------------------------------- Empty states -- */
 
 .empty-state {
+  position: relative;
+  z-index: 1;
   margin: auto;
+  max-width: 34ch;
   text-align: center;
-  color: var(--ion-color-step-600);
-  padding: 40px 20px;
+  padding: 48px 20px;
 }
 
-.empty-state h1,
+.empty-state ion-icon {
+  font-size: 34px;
+  color: var(--zr-gold);
+  opacity: 0.75;
+}
+
 .empty-state h2 {
+  margin: 16px 0 6px;
   font-family: var(--font-display);
-  font-weight: 500;
-  color: var(--ion-text-color);
-  margin: 0 0 6px;
-}
-
-.empty-state h1 {
-  font-size: 24px;
-}
-
-.empty-state h2 {
-  font-size: 18px;
+  font-weight: 600;
+  font-size: 1.12rem;
+  color: var(--zr-text);
 }
 
 .empty-state p {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--zr-text-dim);
 }
 
-/* ---------- Auth ---------- */
+/* ----------------------------------------------------- Simple sections -- */
 
+.panel-page {
+  --background: var(--zr-black);
+}
+
+.settings-group {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 22px 18px;
+}
+
+.settings-group h3 {
+  margin: 0 0 12px;
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--zr-text-faint);
+}
+
+.settings-card {
+  border: 1px solid var(--zr-line);
+  border-radius: var(--zr-radius);
+  background: var(--zr-panel);
+  overflow: hidden;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 17px;
+  font-size: 0.9rem;
+  color: var(--zr-text);
+}
+
+.settings-row + .settings-row {
+  border-top: 1px solid var(--zr-line);
+}
+
+.settings-row span {
+  color: var(--zr-text-dim);
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-row button {
+  border: 1px solid var(--zr-line-gold);
+  border-radius: var(--zr-radius-sm);
+  background: transparent;
+  color: var(--zr-gold-bright);
+  padding: 8px 15px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.settings-row button:hover {
+  background: var(--zr-gold-wash);
+}
+
+/* ---------------------------------------------------------------- Auth -- */
+
+/* The one light surface in the app — matches the login mock. */
 .auth-content {
-  --background: var(--ion-background-color);
+  --background: var(--zr-paper);
+}
+
+.auth-content::part(scroll) {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 32px 26px;
 }
 
 .auth-card {
-  max-width: 320px;
-  margin: 15vh auto 0;
+  width: 100%;
+  max-width: 372px;
+  margin: 0 auto;
 }
 
-.auth-brand {
+.auth-card__mark {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 32px;
+}
+
+.auth-card h1 {
+  margin: 0 0 8px;
   font-family: var(--font-display);
-  font-size: 26px;
-  font-weight: 500;
-  margin-bottom: 20px;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--zr-paper-ink);
 }
 
-.auth-input {
-  --background: var(--ion-color-step-50);
-  border: 1px solid var(--ion-color-step-150);
-  border-radius: 8px;
-  margin-bottom: 4px;
+.auth-card__lede {
+  margin: 0 0 26px;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--zr-paper-dim);
+}
+
+.auth-field {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 14px;
+  padding: 0 14px;
+  border: 1px solid var(--zr-paper-line);
+  border-radius: var(--zr-radius);
+  background: var(--zr-paper-field);
+  transition: border-color 160ms ease;
+}
+
+.auth-field:focus-within {
+  border-color: var(--zr-gold);
+}
+
+.auth-field > ion-icon {
+  font-size: 19px;
+  color: var(--zr-paper-dim);
+  flex: 0 0 auto;
+}
+
+.auth-field ion-input {
+  --background: transparent;
+  --color: var(--zr-paper-ink);
+  --placeholder-color: var(--zr-paper-dim);
+  --placeholder-opacity: 1;
+  --padding-start: 0;
+  --padding-top: 15px;
+  --padding-bottom: 15px;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.93rem;
+}
+
+.auth-field__toggle {
+  border: 0;
+  background: transparent;
+  padding: 4px;
+  color: var(--zr-paper-dim);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.auth-field__toggle ion-icon {
+  font-size: 19px;
+}
+
+.auth-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 6px 0 22px;
+}
+
+.auth-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.88rem;
+  color: var(--zr-paper-ink);
+  cursor: pointer;
+  user-select: none;
+}
+
+.auth-check input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.auth-check__box {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border-radius: 6px;
+  border: 1.5px solid var(--zr-paper-line);
+  background: #fff;
+  color: transparent;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+.auth-check__box ion-icon {
+  font-size: 14px;
+}
+
+.auth-check input:checked + .auth-check__box {
+  background: var(--zr-gold-gradient);
+  border-color: transparent;
+  color: var(--zr-gold-ink);
+}
+
+.auth-check input:focus-visible + .auth-check__box {
+  outline: 2px solid var(--zr-gold);
+  outline-offset: 2px;
+}
+
+.auth-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 0.87rem;
+  font-weight: 500;
+  color: var(--zr-gold-deep);
+  cursor: pointer;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
+}
+
+.auth-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 16px;
+  border: 0;
+  border-radius: var(--zr-radius);
+  background: var(--zr-gold-gradient);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(168, 110, 19, 0.24);
+  transition:
+    filter 160ms ease,
+    opacity 160ms ease;
+}
+
+.auth-submit ion-icon {
+  font-size: 18px;
+}
+
+.auth-submit:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-or {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 24px 0;
+  font-size: 0.82rem;
+  color: var(--zr-paper-dim);
+}
+
+.auth-or::before,
+.auth-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--zr-paper-line);
+}
+
+.auth-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 15px;
+  border: 1px solid var(--zr-paper-line);
+  border-radius: var(--zr-radius);
+  background: #fff;
+  font-family: var(--font-body);
+  font-size: 0.94rem;
+  font-weight: 500;
+  color: var(--zr-paper-ink);
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.auth-google:hover {
+  background: #f3f1ee;
+}
+
+.auth-foot {
+  margin: 28px 0 0;
+  text-align: center;
+  font-size: 0.87rem;
+  color: var(--zr-paper-dim);
+}
+
+.auth-note {
+  margin: 16px 0 0;
+  padding: 13px 15px;
+  border-radius: var(--zr-radius-sm);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.auth-note--error {
+  background: #fdecea;
+  color: #8f2c20;
+}
+
+.auth-note--ok {
+  background: #f1f7ee;
+  color: #33612a;
+}
+
+/* --------------------------------------------------------- Breakpoints -- */
+
+@media (max-width: 620px) {
+  .rail {
+    display: none;
+  }
+
+  .welcome__actions {
+    flex-direction: column;
+    width: 100%;
+    max-width: 320px;
+  }
+
+  .welcome__divider {
+    display: none;
+  }
+
+  .pill-action {
+    justify-content: center;
+  }
+
+  .status-pill {
+    display: none;
+  }
+
+  .message-bubble {
+    max-width: 88%;
+  }
+}
+
+/* The drawer only duplicates the rail's sections where the rail is hidden. */
+@media (min-width: 621px) {
+  .menu-nav-mobile {
+    display: none;
+  }
 }
