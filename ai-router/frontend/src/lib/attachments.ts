@@ -18,6 +18,10 @@ export const MAX_INPUT_BYTES = 25 * 1024 * 1024;
 
 export interface Attachment {
   type: "image";
+  /** Same id used for the quota check and the retention clock server-side
+   * (see access/image_policy.py) — kept alongside the message so a later
+   * resync/availability check has something to key off besides the URL. */
+  imageId: string;
   /** Public URL in Supabase Storage — what gets persisted on the message. */
   url: string;
   /** Data URL, kept in memory for the current request only. */
@@ -36,13 +40,13 @@ export interface Attachment {
  * compression or Storage upload, so a rejected upload never burns
  * bandwidth and never touches Storage.
  */
-async function authorizeUpload(userId: string): Promise<void> {
+async function authorizeUpload(userId: string, imageId: string): Promise<void> {
   if (!BASE) return; // backend not configured — let it through (dev/placeholder mode)
 
   const resp = await fetch(`${BASE}/images/authorize`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: userId }),
+    body: JSON.stringify({ user_id: userId, image_id: imageId }),
   });
 
   if (resp.status === 429) {
@@ -121,10 +125,15 @@ function dataUrlToBlob(dataUrl: string): Blob {
  * policies can scope access by path prefix.
  */
 export async function prepareImage(file: File, userId: string): Promise<Attachment> {
-  await authorizeUpload(userId);
+  // Generated once, up front: this is the ONE id shared by the quota
+  // check, the retention clock, and the Storage path — the backend
+  // has no other way to tell "this specific image" apart from "some
+  // image this user uploaded today".
+  const imageId = crypto.randomUUID();
+  await authorizeUpload(userId, imageId);
 
   const { dataUrl, width, height, bytes } = await compressImage(file);
-  const path = `${userId}/${crypto.randomUUID()}.jpg`;
+  const path = `${userId}/${imageId}.jpg`;
 
   const { error } = await supabase.storage
     .from("attachments")
@@ -135,6 +144,7 @@ export async function prepareImage(file: File, userId: string): Promise<Attachme
     // inline data URL so image chat works before the bucket exists.
     return {
       type: "image",
+      imageId,
       url: "",
       dataUrl,
       mime: "image/jpeg",
@@ -148,6 +158,7 @@ export async function prepareImage(file: File, userId: string): Promise<Attachme
   const { data } = supabase.storage.from("attachments").getPublicUrl(path);
   return {
     type: "image",
+    imageId,
     url: data.publicUrl,
     dataUrl,
     mime: "image/jpeg",

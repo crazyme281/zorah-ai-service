@@ -178,6 +178,10 @@ async def transcribe(audio: UploadFile = File(...)):
 
 class AuthorizeUploadRequest(BaseModel):
     user_id: str
+    # Client-generated UUID, also used as the Storage path — lets the
+    # backend track this specific image's retention clock, not just
+    # the daily quota count.
+    image_id: str
 
 
 class SelectPlanRequest(BaseModel):
@@ -222,7 +226,7 @@ def authorize_upload(req: AuthorizeUploadRequest):
     happens, so quota can't be burned by a failed or duplicate attempt.
     """
     try:
-        quota = image_store.record_upload(req.user_id)
+        quota = image_store.record_upload(req.user_id, req.image_id)
     except ImageQuotaExceeded as e:
         raise HTTPException(
             status_code=429,
@@ -230,6 +234,34 @@ def authorize_upload(req: AuthorizeUploadRequest):
             f"Try again tomorrow, or upgrade for a higher daily limit.",
         )
     return {"authorized": True, "image_quota": quota}
+
+
+class ResyncImageRequest(BaseModel):
+    image_id: str
+    device_has_it: bool
+
+
+@app.get("/images/{image_id}/availability")
+def image_availability(image_id: str):
+    """
+    What the AI layer (or the frontend, before referencing an old
+    attachment) should check before assuming an image is still visible
+    server-side. Never reports "available" for something that's aged
+    out of SERVER_RETENTION — see access/image_policy.py.
+    """
+    return image_store.access_result(image_id)
+
+
+@app.post("/images/resync")
+def resync_image(req: ResyncImageRequest):
+    """
+    Called when the frontend still has an image on-device that the
+    server has aged out — refreshes the server's retention clock so it
+    becomes available again. If the device doesn't have it either,
+    this is a no-op and the image stays unavailable.
+    """
+    resynced = image_store.resync_from_device(req.image_id, req.device_has_it)
+    return {"resynced": resynced, **image_store.access_result(req.image_id)}
 
 
 @app.post("/payments/verify")
