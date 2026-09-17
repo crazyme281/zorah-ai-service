@@ -3,8 +3,9 @@
  * conversations the drawer shows); Images is a stub until the backend
  * returns image attachments; Settings is account plus sign-out.
  */
+import type { MouseEvent } from "react";
 import { IonPage, IonContent, IonList, IonItem, IonLabel, IonIcon, useIonRouter } from "@ionic/react";
-import { imagesOutline, timeOutline } from "ionicons/icons";
+import { imagesOutline, timeOutline, trashOutline } from "ionicons/icons";
 import { TopBar } from "../components/TopBar";
 import { useAuth } from "../hooks/useAuth";
 import { useConversations } from "../hooks/useConversations";
@@ -28,7 +29,13 @@ export function ImagesPage() {
 export function HistoryPage() {
   const router = useIonRouter();
   const { user } = useAuth();
-  const { conversations } = useConversations(user?.id);
+  const { conversations, deleteConversation } = useConversations(user?.id);
+
+  function handleDelete(e: MouseEvent, id: string, title: string) {
+    e.stopPropagation();
+    if (!window.confirm(`Delete "${title}"? This can't be undone.`)) return;
+    deleteConversation(id);
+  }
 
   return (
     <IonPage>
@@ -51,6 +58,13 @@ export function HistoryPage() {
                 onClick={() => router.push(`/chat/${chat.id}`, "none", "replace")}
               >
                 <IonLabel className="ion-text-nowrap">{chat.title}</IonLabel>
+                <IonIcon
+                  icon={trashOutline}
+                  slot="end"
+                  className="chat-delete-icon"
+                  aria-label={`Delete ${chat.title}`}
+                  onClick={(e) => handleDelete(e, chat.id, chat.title)}
+                />
               </IonItem>
             ))}
           </IonList>

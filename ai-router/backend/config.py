@@ -90,4 +90,4 @@ RAG_ROUTE = {
 
 # Per-call timeout in seconds. A provider that hangs past this is treated
 # as failed and the router moves to the next fallback.
-REQUEST_TIMEOUT = 30
+REQUEST_TIMEOUT = 60

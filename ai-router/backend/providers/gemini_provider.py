@@ -37,7 +37,7 @@ class GeminiProvider(BaseProvider):
             "contents": contents,
             "generationConfig": {
                 "temperature": kwargs.get("temperature", 0.7),
-                "maxOutputTokens": kwargs.get("max_tokens", 2048),
+                "maxOutputTokens": kwargs.get("max_tokens", 4096),
             },
         }
         if system_parts:

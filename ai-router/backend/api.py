@@ -136,6 +136,67 @@ async def chat_stream(req: ChatRequest):
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
+class SuggestionsRequest(BaseModel):
+    user_message: str
+    assistant_reply: str
+
+
+class SuggestionsResponse(BaseModel):
+    suggestions: list[str]
+
+
+SUGGESTIONS_SYSTEM_PROMPT = (
+    "You suggest natural follow-up questions for a chat assistant. Given the "
+    "user's last message and the assistant's reply, propose exactly 3 short "
+    "follow-up questions or requests the user might realistically want to ask "
+    "next, specific to what was just discussed — never generic filler like "
+    "'tell me more'. Each under 8 words. Respond with ONLY a JSON array of "
+    "3 strings, nothing else — no markdown fences, no commentary."
+)
+
+# How much of each side of the exchange we'll actually send — long
+# replies don't need to be sent in full for a next-question guess, and it
+# keeps this call cheap regardless of how long the real answer ran.
+SUGGESTIONS_CONTEXT_CHARS = 1200
+
+
+@app.post("/suggestions", response_model=SuggestionsResponse)
+def suggestions(req: SuggestionsRequest):
+    """
+    Cheap, fast follow-up suggestions using Groq directly — bypassing the
+    full router, since this needs no classification, persona, or fallback
+    chain, just one quick well-formed reply. Called by the frontend after
+    a message finishes streaming; never blocks or errors the main chat —
+    any failure here just means no suggestion chips render.
+    """
+    groq = router.providers.get("groq")
+    if groq is None:
+        return {"suggestions": []}
+
+    user_text = req.user_message[:SUGGESTIONS_CONTEXT_CHARS]
+    reply_text = req.assistant_reply[:SUGGESTIONS_CONTEXT_CHARS]
+    prompt = f"User: {user_text}\n\nAssistant: {reply_text}"
+
+    try:
+        raw = groq.chat(
+            [
+                {"role": "system", "content": SUGGESTIONS_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=150,
+            temperature=0.7,
+        )
+        cleaned = raw.strip().strip("`")
+        if cleaned[:4].lower() == "json":
+            cleaned = cleaned[4:].strip()
+        parsed = json.loads(cleaned)
+        items = [str(s).strip() for s in parsed if isinstance(s, str) and s.strip()]
+        return {"suggestions": items[:3]}
+    except Exception as e:
+        logging.warning("suggestions generation failed: %s", e)
+        return {"suggestions": []}
+
+
 GROQ_TRANSCRIBE_ENDPOINT = "https://api.groq.com/openai/v1/audio/transcriptions"
 
 

@@ -48,7 +48,7 @@ class ClaudeProvider(BaseProvider):
         payload = {
             "model": kwargs.get("model", MODELS["claude"]),
             "messages": chat_messages,
-            "max_tokens": kwargs.get("max_tokens", 1024),
+            "max_tokens": kwargs.get("max_tokens", 4096),
             "temperature": kwargs.get("temperature", 0.7),
         }
         if system_parts:

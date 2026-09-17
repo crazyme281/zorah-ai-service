@@ -18,7 +18,7 @@ class GroqProvider(BaseProvider):
             "model": kwargs.get("model", MODELS["groq"]),
             "messages": messages,
             "temperature": kwargs.get("temperature", 0.7),
-            "max_tokens": kwargs.get("max_tokens", 1024),
+            "max_tokens": kwargs.get("max_tokens", 4096),
         }
         try:
             resp = requests.post(

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
-import { streamAIBackend, type OutboundMessage, type ContentBlock } from "../lib/aiBackend";
+import { streamAIBackend, fetchSuggestions, type OutboundMessage, type ContentBlock } from "../lib/aiBackend";
 import type { Attachment } from "../lib/attachments";
 import type { Tables } from "../lib/database.types";
 
@@ -21,6 +21,9 @@ export interface ChatMessage {
   pending?: boolean;
   streaming?: boolean;
   failed?: boolean;
+  /** Follow-up chips shown under this message once it's finished
+   * streaming — undefined while unfetched/loading, [] if none came back. */
+  suggestions?: string[];
 }
 
 function toChatMessage(row: Row & { attachments?: unknown }): ChatMessage {
@@ -184,6 +187,14 @@ export function useMessages(conversationId: string | null) {
             : m,
         ),
       );
+
+      // Best-effort — resolves after the fact, never blocks the reply
+      // itself from finishing or being marked done.
+      fetchSuggestions(content, result.reply).then((suggestions) => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, suggestions } : m)),
+        );
+      });
     } catch (e) {
       if (controller.signal.aborted) return;
       setError(

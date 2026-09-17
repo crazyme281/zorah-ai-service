@@ -181,3 +181,28 @@ export async function transcribeAudio(blob: Blob): Promise<string | null> {
     return null;
   }
 }
+
+/**
+ * Follow-up suggestions for the message that just finished streaming.
+ * Best-effort only — any failure (network, backend down, malformed JSON
+ * server-side) returns an empty list rather than throwing, since a missing
+ * suggestion row should never look like a chat error to the user.
+ */
+export async function fetchSuggestions(
+  userMessage: string,
+  assistantReply: string,
+): Promise<string[]> {
+  if (!BASE) return [];
+  try {
+    const resp = await fetch(`${BASE}/suggestions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_message: userMessage, assistant_reply: assistantReply }),
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return Array.isArray(data.suggestions) ? data.suggestions.filter((s: unknown) => typeof s === "string") : [];
+  } catch {
+    return [];
+  }
+}

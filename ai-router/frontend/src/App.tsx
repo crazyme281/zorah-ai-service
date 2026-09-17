@@ -26,7 +26,7 @@ export default function App() {
     signOut,
   } = useAuth();
   const { projects, createProject } = useProjects(user?.id);
-  const { conversations, createConversation } = useConversations(user?.id);
+  const { conversations, createConversation, deleteConversation } = useConversations(user?.id);
 
   const [splashDone, setSplashDone] = useState(false);
   const [splashGone, setSplashGone] = useState(false);
@@ -82,6 +82,7 @@ export default function App() {
               conversations={conversations}
               onNewChat={handleNewChat}
               onNewProject={handleNewProject}
+              onDeleteChat={deleteConversation}
               userEmail={user.email ?? null}
               onSignOut={signOut}
             />

@@ -11,8 +11,15 @@ import {
   useIonRouter,
 } from "@ionic/react";
 import { menuController } from "@ionic/core";
+import type { MouseEvent } from "react";
 import { useLocation } from "react-router-dom";
-import { addOutline, folderOutline, addCircleOutline, logOutOutline } from "ionicons/icons";
+import {
+  addOutline,
+  folderOutline,
+  addCircleOutline,
+  logOutOutline,
+  trashOutline,
+} from "ionicons/icons";
 import type { Tables } from "../lib/database.types";
 import { ZorahLogo } from "./ZorahLogo";
 import { RAIL_ITEMS, isRailActive } from "./IconRail";
@@ -25,6 +32,7 @@ interface AppMenuProps {
   conversations: Conversation[];
   onNewChat: (projectId: string | null) => void;
   onNewProject: () => void;
+  onDeleteChat: (id: string) => void;
   userEmail: string | null;
   onSignOut: () => void;
 }
@@ -34,6 +42,7 @@ export function AppMenu({
   conversations,
   onNewChat,
   onNewProject,
+  onDeleteChat,
   userEmail,
   onSignOut,
 }: AppMenuProps) {
@@ -44,6 +53,15 @@ export function AppMenu({
   async function go(path: string) {
     await menuController.close("app-menu");
     router.push(path, "none", "replace");
+  }
+
+  // Deleting the chat you're currently viewing bounces you back to the
+  // welcome screen instead of leaving you parked on a chat that's gone.
+  function handleDelete(e: MouseEvent, chatId: string) {
+    e.stopPropagation();
+    if (!window.confirm("Delete this chat? This can't be undone.")) return;
+    onDeleteChat(chatId);
+    if (pathname === `/chat/${chatId}`) router.push("/", "none", "replace");
   }
 
   return (
@@ -123,6 +141,13 @@ export function AppMenu({
                             onClick={() => go(`/chat/${chat.id}`)}
                           >
                             <IonLabel className="ion-text-nowrap">{chat.title}</IonLabel>
+                            <IonIcon
+                              icon={trashOutline}
+                              slot="end"
+                              className="chat-delete-icon"
+                              aria-label={`Delete ${chat.title}`}
+                              onClick={(e) => handleDelete(e, chat.id)}
+                            />
                           </IonItem>
                         ))}
                       </IonList>
@@ -151,6 +176,13 @@ export function AppMenu({
               onClick={() => go(`/chat/${chat.id}`)}
             >
               <IonLabel className="ion-text-nowrap">{chat.title}</IonLabel>
+              <IonIcon
+                icon={trashOutline}
+                slot="end"
+                className="chat-delete-icon"
+                aria-label={`Delete ${chat.title}`}
+                onClick={(e) => handleDelete(e, chat.id)}
+              />
             </IonItem>
           ))}
         </IonList>

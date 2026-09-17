@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   IonPage,
   IonContent,
@@ -19,6 +21,9 @@ import {
   closeOutline,
   stopOutline,
   arrowDownOutline,
+  copyOutline,
+  checkmarkOutline,
+  shareSocialOutline,
 } from "ionicons/icons";
 import { useConversations } from "../hooks/useConversations";
 import { useMessages } from "../hooks/useMessages";
@@ -44,6 +49,7 @@ export function ChatPage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [preparing, setPreparing] = useState(false);
   const [atBottom, setAtBottom] = useState(true);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const contentRef = useRef<HTMLIonContentElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -131,6 +137,38 @@ export function ChatPage() {
     setAttachments([]);
   }
 
+  /** Suggestion chips send immediately rather than filling the composer —
+   * they only ever appear once a chat already exists, so there's no
+   * welcome-screen "create first" branch to handle here. */
+  function handleSuggestionClick(text: string) {
+    if (!conversationId || sending) return;
+    stickRef.current = true;
+    sendMessage(text, []);
+  }
+
+  async function handleCopy(id: string, text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1800);
+    } catch {
+      // Clipboard permission denied or unavailable — nothing useful to do
+      // beyond leaving the button in its normal state.
+    }
+  }
+
+  async function handleShare(text: string) {
+    if (navigator.share) {
+      try {
+        await navigator.share({ text, title: "Zorah AI" });
+      } catch {
+        // AbortError when the user cancels the share sheet — not an error.
+      }
+    } else {
+      handleCopy("share-fallback", text);
+    }
+  }
+
   const recording = voice.status === "recording";
   const busy = sending || preparing || voice.status === "transcribing";
 
@@ -180,37 +218,87 @@ export function ChatPage() {
           )}
 
           {conversationId &&
-            messages.map((m) => (
-              <div key={m.id} className={`message message--${m.role}`}>
-                <div className={`message-bubble ${m.failed ? "message-bubble--failed" : ""}`}>
-                  {m.attachments.length > 0 && (
-                    <div className="message-shots">
-                      {m.attachments.map((att, i) => (
-                        <img
-                          key={i}
-                          src={att.url || att.dataUrl}
-                          alt={att.name || "Attached image"}
-                          loading="lazy"
-                        />
-                      ))}
-                    </div>
-                  )}
+            messages.map((m, idx) => {
+              const isLast = idx === messages.length - 1;
+              const done = !m.streaming && !m.pending;
+              return (
+                <div key={m.id} className={`message message--${m.role}`}>
+                  <div className={`message-bubble ${m.failed ? "message-bubble--failed" : ""}`}>
+                    {m.attachments.length > 0 && (
+                      <div className="message-shots">
+                        {m.attachments.map((att, i) => (
+                          <img
+                            key={i}
+                            src={att.url || att.dataUrl}
+                            alt={att.name || "Attached image"}
+                            loading="lazy"
+                          />
+                        ))}
+                      </div>
+                    )}
 
-                  {m.content && <div className="message-text">{m.content}</div>}
+                    {m.content && (
+                      <div className="message-text markdown-body">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                      </div>
+                    )}
 
-                  {m.streaming && !m.content && (
-                    <div className="typing" aria-label="Zorah is thinking">
-                      <i />
-                      <i />
-                      <i />
-                      <span>Thinking…</span>
-                    </div>
-                  )}
+                    {m.streaming && !m.content && (
+                      <div className="typing" aria-label="Zorah is thinking">
+                        <i />
+                        <i />
+                        <i />
+                        <span>Thinking…</span>
+                      </div>
+                    )}
 
-                  {m.streaming && m.content && <span className="caret" aria-hidden="true" />}
+                    {m.streaming && m.content && <span className="caret" aria-hidden="true" />}
+
+                    {done && m.content && !m.failed && (
+                      <div className="message-actions">
+                        <button
+                          type="button"
+                          className="message-actions__btn"
+                          aria-label="Copy message"
+                          onClick={() => handleCopy(m.id, m.content)}
+                        >
+                          <IonIcon icon={copiedId === m.id ? checkmarkOutline : copyOutline} />
+                          {copiedId === m.id ? "Copied" : "Copy"}
+                        </button>
+                        <button
+                          type="button"
+                          className="message-actions__btn"
+                          aria-label="Share message"
+                          onClick={() => handleShare(m.content)}
+                        >
+                          <IonIcon icon={shareSocialOutline} />
+                          Share
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {isLast &&
+                    m.role === "assistant" &&
+                    done &&
+                    !sending &&
+                    !!m.suggestions?.length && (
+                      <div className="suggestions">
+                        {m.suggestions.map((s, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            className="suggestions__chip"
+                            onClick={() => handleSuggestionClick(s)}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
           {error && <div className="thread-error">{error}</div>}
         </div>

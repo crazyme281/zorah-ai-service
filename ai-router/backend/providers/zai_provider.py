@@ -18,7 +18,7 @@ class ZaiProvider(BaseProvider):
             "model": kwargs.get("model", MODELS["zai"]),
             "messages": messages,
             "temperature": kwargs.get("temperature", 0.7),
-            "max_tokens": kwargs.get("max_tokens", 2048),
+            "max_tokens": kwargs.get("max_tokens", 4096),
         }
         # Pass tools through untouched if the caller supplied them —
         # this is what makes zai usable as the "agent" primary.
