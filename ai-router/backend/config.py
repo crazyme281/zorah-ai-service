@@ -46,7 +46,10 @@ FLUTTERWAVE_SECRET_KEY = os.getenv("FLUTTERWAVE_SECRET_KEY")
 # ---------------------------------------------------------------------------
 MODELS = {
     "claude": "claude-haiku-4-5-20251001",
-    "gemini": "gemini-2.0-flash",
+    # gemini-2.0-flash was retired; Google's deprecation error names this
+    # as its replacement. If this breaks in turn later, whatever error
+    # Gemini returns will again name the model to switch to.
+    "gemini": "gemini-3.6-flash",
     "zai": "glm-4-plus",
     "groq": "openai/gpt-oss-120b",
     "cohere_chat": "command-r-plus",

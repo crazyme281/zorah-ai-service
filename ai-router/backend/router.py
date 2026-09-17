@@ -107,6 +107,27 @@ class AIRouter:
             chain = vision_first + [p for p in chain if p not in vision_first]
         return self._filter_chain_for_tier(chain, user_id)
 
+    def _flatten_text_only(self, messages: list[dict]) -> list[dict]:
+        """
+        Collapses any message carrying an image block down to its text
+        portion plus a plain note that an image was attached — used only
+        for providers that aren't in VISION_CAPABLE, right before calling
+        them, so they get something they can actually parse instead of a
+        content shape their API rejects outright.
+        """
+        flat = []
+        for m in messages:
+            content = m["content"]
+            if isinstance(content, list) and any(
+                isinstance(b, dict) and b.get("type") == "image_url" for b in content
+            ):
+                text = extract_text(content)
+                note = "[The user attached an image, but this model can't see it.]"
+                flat.append({**m, "content": f"{text}\n\n{note}".strip() if text else note})
+            else:
+                flat.append(m)
+        return flat
+
     def chat(
         self,
         messages: list[dict],
@@ -149,14 +170,24 @@ class AIRouter:
 
         chain = self._build_chain(route, call_messages, user_id)
         attempts = []
+        image_present = has_image(call_messages)
 
         for provider_name in chain:
             provider = self.providers.get(provider_name)
             if provider is None:
                 attempts.append((provider_name, "not configured"))
                 continue
+            # A provider outside VISION_CAPABLE has no way to parse an
+            # image block — Groq/Z.ai/Cohere all hard-400 the instant they
+            # see one, which used to burn an attempt on a guaranteed
+            # failure every time both vision providers were unavailable.
+            # Strip the image down to a text note instead, so a non-vision
+            # fallback can still answer the text part of the message.
+            provider_messages = call_messages
+            if image_present and provider_name not in VISION_CAPABLE:
+                provider_messages = self._flatten_text_only(call_messages)
             try:
-                reply = provider.chat(call_messages, **kwargs)
+                reply = provider.chat(provider_messages, **kwargs)
                 return {
                     "reply": reply,
                     "provider": provider_name,
