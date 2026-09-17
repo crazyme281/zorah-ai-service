@@ -18,15 +18,20 @@ class GeminiProvider(BaseProvider):
         # Gemini splits out a system instruction and expects
         # user/model roles (not user/assistant) inside "contents".
         system_parts = [m["content"] for m in messages if m["role"] == "system"]
+        # Same reasoning as claude_provider.py: to_gemini_parts fetches and
+        # base64-encodes any attached image, and an unwrapped failure there
+        # would abort this whole call instead of letting the router fall
+        # back to the next provider — so it's caught and re-raised as the
+        # error type router.chat() actually knows how to handle.
         contents = []
-        for m in messages:
-            if m["role"] == "system":
-                continue
-            role = "model" if m["role"] == "assistant" else "user"
-            # to_gemini_parts handles both plain string content and a
-            # {text|image_url} block list, converting any image into
-            # inline_data base64 since Gemini can't fetch a URL itself.
-            contents.append({"role": role, "parts": to_gemini_parts(m["content"])})
+        try:
+            for m in messages:
+                if m["role"] == "system":
+                    continue
+                role = "model" if m["role"] == "assistant" else "user"
+                contents.append({"role": role, "parts": to_gemini_parts(m["content"])})
+        except Exception as e:
+            raise ProviderUnavailableError(f"gemini: couldn't process attachment ({e})")
 
         payload = {
             "contents": contents,

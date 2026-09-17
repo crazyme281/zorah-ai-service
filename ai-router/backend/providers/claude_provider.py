@@ -28,11 +28,22 @@ class ClaudeProvider(BaseProvider):
         # normalizes either shape into Anthropic's block format, turning
         # any image into a base64 `source` since Claude's public API
         # can't fetch a URL itself.
-        chat_messages = [
-            {"role": m["role"], "content": to_anthropic_blocks(m["content"])}
-            for m in messages
-            if m["role"] != "system"
-        ]
+        # to_anthropic_blocks fetches and base64-encodes any attached image
+        # (see utils/multimodal.py) — a network hiccup, a slow Storage
+        # response, or a non-image URL raises a raw requests exception here.
+        # Left unwrapped, that exception is neither RateLimitError nor
+        # ProviderUnavailableError, so router.chat()'s except clauses don't
+        # catch it: it aborts the ENTIRE request instead of falling back to
+        # the next provider in the chain (e.g. Gemini), which is what every
+        # other kind of provider failure already does correctly.
+        try:
+            chat_messages = [
+                {"role": m["role"], "content": to_anthropic_blocks(m["content"])}
+                for m in messages
+                if m["role"] != "system"
+            ]
+        except Exception as e:
+            raise ProviderUnavailableError(f"claude: couldn't process attachment ({e})")
 
         payload = {
             "model": kwargs.get("model", MODELS["claude"]),
