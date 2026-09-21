@@ -1,6 +1,6 @@
 /**
- * Shared header across every section so the brand and status sit in the same
- * place regardless of where you are.
+ * Shared header across every section so the brand and status sit in the
+ * same place regardless of where you are.
  */
 import {
   IonHeader,
@@ -10,11 +10,19 @@ import {
   IonIcon,
   useIonRouter,
 } from "@ionic/react";
-import { personOutline } from "ionicons/icons";
+import { personOutline, sparklesOutline } from "ionicons/icons";
 import { ZorahLogo } from "./ZorahLogo";
+import { usePlan } from "../hooks/usePlan";
 
 export function TopBar({ online = true }: { online?: boolean }) {
   const router = useIonRouter();
+  const { plan } = usePlan();
+
+  // FREE -> "Get Go", GO -> "Get Pro", PRO -> no button at all, matching
+  // the reference design exactly (each tier's header only ever offers
+  // the next step up, never skips one, never shows once there's nowhere
+  // higher to go).
+  const upgradeLabel = plan?.tier === "GO" ? "Get Pro" : plan?.tier === "PRO" ? null : "Get Go";
 
   return (
     <IonHeader className="ion-no-border">
@@ -33,6 +41,16 @@ export function TopBar({ online = true }: { online?: boolean }) {
             <i className="status-pill__dot" />
             {online ? "Online" : "Offline"}
           </span>
+          {upgradeLabel && (
+            <button
+              type="button"
+              className="upgrade-pill"
+              onClick={() => router.push("/upgrade", "none", "replace")}
+            >
+              <IonIcon icon={sparklesOutline} />
+              {upgradeLabel}
+            </button>
+          )}
           <button
             type="button"
             className="avatar-btn"

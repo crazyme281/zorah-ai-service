@@ -12,6 +12,10 @@ import { SplashScreen } from "./components/SplashScreen";
 import { ChatPage } from "./pages/ChatPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ImagesPage, HistoryPage, SettingsPage } from "./pages/SectionPages";
+import { CodeFixerPage } from "./pages/CodeFixerPage";
+import { UpgradePage } from "./pages/UpgradePage";
+import { AdminApkPage } from "./pages/AdminApkPage";
+import { ApkPopups } from "./components/ApkPopups";
 
 /** Minimum time the splash stays up, so the brand doesn't flash past. */
 const SPLASH_MS = 1400;
@@ -24,6 +28,7 @@ export default function App() {
     signInWithEmail,
     signInWithGoogle,
     signOut,
+    linkWithCode,
   } = useAuth();
   const { projects, createProject } = useProjects(user?.id);
   const { conversations, createConversation, deleteConversation } = useConversations(user?.id);
@@ -74,6 +79,7 @@ export default function App() {
             onSubmitPassword={signInWithPassword}
             onSubmitMagicLink={signInWithEmail}
             onGoogle={signInWithGoogle}
+            onLinkWithCode={linkWithCode}
           />
         ) : (
           <IonReactRouter>
@@ -86,14 +92,18 @@ export default function App() {
               userEmail={user.email ?? null}
               onSignOut={signOut}
             />
+            <ApkPopups />
             <div className="app-shell">
               <IconRail />
               <div className="app-shell__main">
                 <IonRouterOutlet id="main-content">
                   <Route exact path="/chat/:conversationId" component={ChatPage} />
                   <Route exact path="/images" component={ImagesPage} />
+                  <Route exact path="/code" component={CodeFixerPage} />
                   <Route exact path="/history" component={HistoryPage} />
                   <Route exact path="/settings" component={SettingsPage} />
+                  <Route exact path="/admin/apk" component={AdminApkPage} />
+                  <Route exact path="/upgrade" component={UpgradePage} />
                   <Route exact path="/">
                     {pendingRedirect ? <Redirect to={pendingRedirect} /> : <ChatPage />}
                   </Route>

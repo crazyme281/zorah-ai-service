@@ -81,18 +81,25 @@ class SubscriptionStore:
         rows = select("profiles", {"user_id": f"eq.{user_id}", "select": "*"})
         if rows:
             return rows[0]
-        # No row yet — this user hasn't completed plan selection/
-        # onboarding. Treat as FREE without writing anything; the row
-        # is created by set_free() or set_tier(), not by reading.
-        return {
-            "user_id": user_id,
-            "tier": Tier.FREE.value,
-            "subscription_status": "none",
-            "subscription_start": None,
-            "subscription_expiration": None,
-            "grace_period_expiration": None,
-            "onboarding_completed": False,
-        }
+        # No row yet. This used to return a synthesized default without
+        # writing anything, on the assumption that set_free() (called
+        # from POST /account/plan/select) would create the real row
+        # during onboarding — but nothing on the frontend actually calls
+        # that endpoint, so in practice no user ever got a profiles row
+        # at all. Fixed by writing the default here, on first read,
+        # rather than depending on a specific endpoint being hit first.
+        # on_conflict=user_id makes this safe if two requests race for
+        # the same brand-new user.
+        return upsert(
+            "profiles",
+            {
+                "user_id": user_id,
+                "tier": Tier.FREE.value,
+                "subscription_status": "none",
+                "onboarding_completed": False,
+            },
+            on_conflict="user_id",
+        )
 
     def get_tier(self, user_id: str) -> Tier:
         profile = self.get_profile(user_id)

@@ -1592,3 +1592,801 @@ ion-item:hover .chat-delete-icon {
   font-weight: 600;
   background: rgba(255, 255, 255, 0.05);
 }
+/* ------------------------------------------------------ Device linking -- */
+
+.auth-devicelink {
+  margin-top: 18px;
+}
+
+.auth-devicelink__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.86rem;
+}
+
+.auth-devicelink__toggle ion-icon {
+  font-size: 16px;
+}
+
+.devicelink-card {
+  display: block;
+}
+
+.devicelink-body {
+  padding: 4px 17px 15px;
+}
+
+.devicelink-body > button {
+  width: 100%;
+  padding: 11px;
+  border: 1px solid var(--zr-line-gold);
+  border-radius: var(--zr-radius-sm);
+  background: transparent;
+  color: var(--zr-gold-bright);
+  font-size: 0.87rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.devicelink-body > button:hover {
+  background: var(--zr-gold-wash);
+}
+
+.devicelink-code {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--zr-radius-sm);
+  background: var(--zr-raised);
+  border: 1px solid var(--zr-line-gold);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--zr-gold-bright);
+}
+
+.devicelink-code button {
+  border: 0;
+  background: transparent;
+  color: var(--zr-text-dim);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.devicelink-code button ion-icon {
+  font-size: 18px;
+}
+
+.devicelink-hint {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--zr-text-dim);
+  text-align: center;
+}
+
+.devicelink-error {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  color: #e79b8f;
+  text-align: center;
+}
+
+.devicelink-row__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.devicelink-row__label ion-icon {
+  font-size: 17px;
+  color: var(--zr-text-faint);
+}
+
+/* ------------------------------------------------------------ APK popups -- */
+
+.apk-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+.apk-popup {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  padding: 30px 24px 24px;
+  border-radius: var(--zr-radius-lg);
+  background: var(--zr-panel);
+  border: 1px solid var(--zr-line-gold);
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.apk-popup__close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--zr-text-faint);
+  cursor: pointer;
+}
+
+.apk-popup__close:hover {
+  color: var(--zr-text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.apk-popup__icon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: var(--zr-gold-wash);
+  color: var(--zr-gold-bright);
+}
+
+.apk-popup__icon ion-icon {
+  font-size: 26px;
+}
+
+.apk-popup h3 {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 1.14rem;
+  font-weight: 600;
+  color: var(--zr-text);
+}
+
+.apk-popup p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--zr-text-dim);
+}
+
+.apk-popup__progress {
+  margin-top: 14px;
+  font-size: 0.82rem;
+  color: var(--zr-gold-bright);
+}
+
+.apk-popup__error {
+  margin: 12px 0 0;
+  font-size: 0.82rem;
+  color: #e79b8f;
+}
+
+.apk-popup__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.apk-popup__btn {
+  flex: 1;
+  padding: 12px;
+  border-radius: var(--zr-radius-sm);
+  border: 1px solid transparent;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.apk-popup__btn--ghost {
+  background: transparent;
+  border-color: var(--zr-line);
+  color: var(--zr-text-dim);
+}
+
+.apk-popup__btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.apk-popup__btn--gold {
+  background: var(--zr-gold-gradient);
+  color: var(--zr-gold-ink);
+}
+
+.apk-popup__btn--gold:hover {
+  filter: brightness(1.06);
+}
+
+.apk-popup__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* -------------------------------------------------------- Version indicator -- */
+
+.version-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: default;
+}
+
+.version-indicator__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.version-indicator--current {
+  color: var(--zr-text-dim);
+}
+
+.version-indicator--current .version-indicator__dot {
+  background: var(--zr-text-faint);
+}
+
+.version-indicator--update {
+  cursor: pointer;
+  color: #3ddc7f;
+}
+
+.version-indicator--update .version-indicator__dot {
+  background: #3ddc7f;
+  box-shadow: 0 0 8px rgba(61, 220, 127, 0.7);
+}
+
+.version-indicator--update:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* --------------------------------------------------------------- Admin APK -- */
+
+.admin-apk__loading {
+  display: grid;
+  place-items: center;
+  padding: 30px;
+}
+
+.admin-apk__upload {
+  padding: 30px 20px;
+  text-align: center;
+}
+
+.admin-apk__upload ion-icon {
+  font-size: 30px;
+  color: var(--zr-gold);
+}
+
+.admin-apk__upload p {
+  margin: 12px 0 16px;
+  font-size: 0.88rem;
+  color: var(--zr-text-dim);
+}
+
+.admin-apk__upload button,
+.admin-apk .settings-row button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.admin-apk__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #3ddc7f;
+  font-weight: 600;
+}
+
+.admin-apk__error {
+  margin: 10px 14px 14px;
+  font-size: 0.83rem;
+  color: #e79b8f;
+}
+
+/* ---------------------------------------------------------------- Code Fixer -- */
+
+.codefix {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 22px 18px 60px;
+}
+
+.codefix__intro {
+  text-align: center;
+  padding: 20px 10px 30px;
+}
+
+.codefix__intro ion-icon {
+  font-size: 32px;
+  color: var(--zr-gold);
+}
+
+.codefix__intro h2 {
+  margin: 12px 0 6px;
+  font-family: var(--font-display);
+  font-size: 1.24rem;
+  font-weight: 600;
+  color: var(--zr-text);
+}
+
+.codefix__intro p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--zr-text-dim);
+}
+
+.codefix__drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 40px 20px;
+  border: 1.5px dashed var(--zr-line-gold);
+  border-radius: var(--zr-radius-lg);
+  background: rgba(255, 255, 255, 0.015);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.codefix__drop:hover,
+.codefix__drop--active {
+  border-color: rgba(214, 156, 46, 0.7);
+  background: var(--zr-gold-wash);
+}
+
+.codefix__drop ion-icon {
+  font-size: 30px;
+  color: var(--zr-gold-bright);
+  margin-bottom: 4px;
+}
+
+.codefix__drop p {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--zr-text);
+}
+
+.codefix__drop small {
+  font-size: 0.78rem;
+  color: var(--zr-text-faint);
+}
+
+.codefix__filename {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+}
+
+.codefix__error {
+  margin: 14px 0 0;
+  padding: 11px 14px;
+  border-radius: var(--zr-radius-sm);
+  border: 1px solid rgba(200, 80, 60, 0.4);
+  background: rgba(200, 80, 60, 0.1);
+  color: #f0b8ae;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.codefix__start {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  margin-top: 18px;
+  padding: 14px;
+  border: 0;
+  border-radius: var(--zr-radius);
+  background: var(--zr-gold-gradient);
+  color: var(--zr-gold-ink);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.codefix__start:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.codefix__start:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.codefix__ghost {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--zr-line);
+  border-radius: var(--zr-radius);
+  background: transparent;
+  color: var(--zr-text-dim);
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.codefix__ghost:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.codefix__progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.codefix__progress h3 {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--zr-text);
+}
+
+.codefix__progress p {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--zr-text-dim);
+}
+
+.codefix__report {
+  padding-top: 6px;
+}
+
+.codefix__final {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: var(--zr-radius);
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 20px;
+}
+
+.codefix__final ion-icon {
+  font-size: 21px;
+}
+
+.codefix__final--success {
+  background: rgba(61, 220, 127, 0.1);
+  border: 1px solid rgba(61, 220, 127, 0.35);
+  color: #3ddc7f;
+}
+
+.codefix__final--partial {
+  background: var(--zr-gold-wash);
+  border: 1px solid var(--zr-line-gold);
+  color: var(--zr-gold-bright);
+}
+
+.codefix__final--failed {
+  background: rgba(200, 80, 60, 0.1);
+  border: 1px solid rgba(200, 80, 60, 0.35);
+  color: #f0b8ae;
+}
+
+.codefix section {
+  margin-bottom: 20px;
+}
+
+.codefix section h4 {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--zr-text-faint);
+  text-transform: uppercase;
+}
+
+.codefix section ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 0.88rem;
+  color: var(--zr-text);
+  line-height: 1.6;
+}
+
+.codefix__muted {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--zr-text-faint);
+}
+
+.codefix__files {
+  list-style: none !important;
+  padding-left: 0 !important;
+}
+
+.codefix__files li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 12px;
+  border-radius: var(--zr-radius-sm);
+  background: var(--zr-raised);
+  border: 1px solid var(--zr-line);
+  margin-bottom: 6px;
+}
+
+.codefix__files code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  color: var(--zr-gold-bright);
+}
+
+.codefix__files span {
+  font-size: 0.82rem;
+  color: var(--zr-text-dim);
+}
+
+.codefix__validation {
+  list-style: none !important;
+  padding-left: 0 !important;
+}
+
+.codefix__validation li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  text-transform: capitalize;
+}
+
+.codefix__validation li.pass {
+  color: #3ddc7f;
+}
+
+.codefix__validation li.fail {
+  color: #e79b8f;
+}
+
+.codefix__actions {
+  margin-top: 8px;
+}
+/* ------------------------------------------------------------- Upgrade pill -- */
+
+.upgrade-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 10px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: var(--zr-radius-pill);
+  background: var(--zr-gold-gradient);
+  color: var(--zr-gold-ink);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.upgrade-pill:hover {
+  filter: brightness(1.06);
+}
+
+.upgrade-pill ion-icon {
+  font-size: 15px;
+}
+
+@media (max-width: 620px) {
+  .upgrade-pill span {
+    display: none;
+  }
+}
+
+/* ----------------------------------------------------------------- Upgrade page -- */
+
+.upgrade {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px 18px 60px;
+}
+
+.upgrade__loading {
+  display: grid;
+  place-items: center;
+  padding: 80px 0;
+}
+
+.upgrade__done {
+  text-align: center;
+  padding: 70px 20px;
+}
+
+.upgrade__done ion-icon {
+  font-size: 34px;
+  color: var(--zr-gold);
+}
+
+.upgrade__done h2 {
+  margin: 14px 0 6px;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--zr-text);
+}
+
+.upgrade__done p {
+  margin: 0;
+  color: var(--zr-text-dim);
+  font-size: 0.9rem;
+}
+
+.upgrade__toggle {
+  display: flex;
+  padding: 4px;
+  margin-bottom: 20px;
+  border-radius: var(--zr-radius-pill);
+  border: 1px solid var(--zr-line-gold);
+  background: var(--zr-panel);
+}
+
+.upgrade__toggle button {
+  flex: 1;
+  padding: 11px;
+  border: 0;
+  border-radius: var(--zr-radius-pill);
+  background: transparent;
+  color: var(--zr-text-dim);
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.upgrade__toggle button.active {
+  background: var(--zr-gold-gradient);
+  color: var(--zr-gold-ink);
+}
+
+.upgrade__table {
+  border: 1px solid var(--zr-line);
+  border-radius: var(--zr-radius);
+  overflow: hidden;
+  background: var(--zr-panel);
+}
+
+.upgrade__row {
+  display: grid;
+  grid-template-columns: 1fr 90px 90px;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--zr-line);
+  font-size: 0.88rem;
+  color: var(--zr-text);
+}
+
+.upgrade__row:last-child {
+  border-bottom: 0;
+}
+
+.upgrade__row > span:not(:first-child) {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.upgrade__row--head {
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.upgrade__row--head span.current {
+  color: var(--zr-gold-bright);
+}
+
+.upgrade__row--head small {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--zr-text-faint);
+}
+
+.upgrade__row--price {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.upgrade__cell-text {
+  font-size: 0.82rem;
+  color: var(--zr-text-dim);
+}
+
+.upgrade__row ion-icon.yes {
+  font-size: 18px;
+  color: #3ddc7f;
+}
+
+.upgrade__row ion-icon.no {
+  font-size: 16px;
+  color: var(--zr-text-faint);
+}
+
+.upgrade__pay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  margin-top: 22px;
+  padding: 15px;
+  border: 0;
+  border-radius: var(--zr-radius);
+  background: var(--zr-gold-gradient);
+  color: var(--zr-gold-ink);
+  font-size: 0.96rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.upgrade__pay:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.upgrade__pay:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.upgrade__success {
+  margin: 18px 0 0;
+  padding: 12px 16px;
+  border-radius: var(--zr-radius-sm);
+  background: rgba(61, 220, 127, 0.1);
+  border: 1px solid rgba(61, 220, 127, 0.35);
+  color: #3ddc7f;
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.upgrade__error {
+  margin: 18px 0 0;
+  padding: 12px 16px;
+  border-radius: var(--zr-radius-sm);
+  background: rgba(200, 80, 60, 0.1);
+  border: 1px solid rgba(200, 80, 60, 0.35);
+  color: #f0b8ae;
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.upgrade__note {
+  margin: 16px 0 0;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--zr-text-faint);
+}

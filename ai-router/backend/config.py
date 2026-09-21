@@ -22,6 +22,9 @@ API_KEYS = {
     "zai": os.getenv("ZAI_API_KEY"),
     "cohere": os.getenv("COHERE_API_KEY"),
     "groq": os.getenv("GROQ_API_KEY"),
+    # Only used by Code Fixer's own provider chain (access/codefix_ai.py),
+    # not the main chat router — OpenAI isn't part of ROUTES below.
+    "openai": os.getenv("OPENAI_API_KEY"),
 }
 
 
@@ -55,7 +58,27 @@ MODELS = {
     "cohere_chat": "command-r-plus",
     "cohere_embed": "embed-english-v3.0",
     "cohere_rerank": "rerank-english-v3.0",
+    # Code Fixer only — a cost-effective default; override with the
+    # OPENAI_MODEL env var if you want a stronger (and pricier) model
+    # for this specifically.
+    "openai": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
 }
+
+
+# ---------------------------------------------------------------------------
+# Code Fixer — the separate worker service that actually runs untrusted
+# `npm install`/`pytest`/etc. It holds no secrets of its own; the main
+# backend authenticates to it with this shared secret and nothing else.
+WORKER_URL = os.getenv("CODE_FIXER_WORKER_URL")
+WORKER_SHARED_SECRET = os.getenv("WORKER_SHARED_SECRET")
+
+MAX_UPLOAD_ZIP_BYTES = 60 * 1024 * 1024
+MAX_EXTRACTED_BYTES = 300 * 1024 * 1024
+MAX_UPLOAD_FILE_COUNT = 6000
+MAX_REPAIR_ATTEMPTS = 3
+# Total characters of source handed to the AI in one call — keeps the
+# request bounded regardless of how large the uploaded project is.
+CODE_CONTEXT_BUDGET_CHARS = 60_000
 
 
 # ---------------------------------------------------------------------------

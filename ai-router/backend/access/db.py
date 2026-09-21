@@ -22,6 +22,13 @@ def _headers(extra: dict | None = None) -> dict:
     return headers
 
 
+# Public alias — other modules (access/devices.py) need the same
+# service-role headers for calls this module doesn't wrap (Admin API
+# endpoints outside /rest/v1), and importing a leading-underscore name
+# across modules is the kind of thing that quietly breaks later.
+service_headers = _headers
+
+
 def select(table: str, params: dict) -> list[dict]:
     resp = requests.get(
         f"{SUPABASE_URL}/rest/v1/{table}",
@@ -44,6 +51,35 @@ def upsert(table: str, row: dict, on_conflict: str) -> dict:
     resp.raise_for_status()
     data = resp.json()
     return data[0] if data else row
+
+
+def patch(table: str, params: dict, fields: dict) -> list[dict]:
+    """PATCHes rows matching `params` (PostgREST filter syntax, e.g.
+    {"id": "eq.<uuid>"}) and returns the changed rows — an empty list
+    means the filter matched nothing, which callers can use to detect a
+    no-op update (e.g. a status guard that didn't hold)."""
+    resp = requests.patch(
+        f"{SUPABASE_URL}/rest/v1/{table}",
+        headers=_headers({"Prefer": "return=representation"}),
+        params=params,
+        json=fields,
+        timeout=REQUEST_TIMEOUT,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def delete(table: str, params: dict) -> None:
+    """Deletes rows matching `params` (PostgREST filter syntax). No
+    return value — callers that need to know whether anything was
+    actually deleted should select() first."""
+    resp = requests.delete(
+        f"{SUPABASE_URL}/rest/v1/{table}",
+        headers=_headers({"Prefer": "return=minimal"}),
+        params=params,
+        timeout=REQUEST_TIMEOUT,
+    )
+    resp.raise_for_status()
 
 
 def insert(table: str, row: dict) -> dict:

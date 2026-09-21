@@ -4,3 +4,4 @@ numpy>=1.26.0
 fastapi>=0.111.0
 uvicorn[standard]>=0.30.0
 python-multipart>=0.0.9
+pyaxmlparser>=0.3.30

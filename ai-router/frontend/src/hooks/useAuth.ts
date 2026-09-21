@@ -1,8 +1,20 @@
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "../lib/supabase";
+import { getDeviceInstallationId, currentPlatform } from "../lib/deviceId";
 
 const REMEMBER_KEY = "zorah:remember";
+const BASE = import.meta.env.VITE_AI_BACKEND_URL;
+
+export interface LinkedDevice {
+  id: string;
+  device_installation_id: string;
+  platform: string;
+  linked_at: string;
+  last_seen: string;
+  revoked_at: string | null;
+}
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -18,6 +30,31 @@ export function useAuth() {
     });
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  // Every successful sign-in on the native app registers this install in
+  // user_devices — not just the pairing-code path, so Google/password
+  // logins done directly on the phone show up in Settings too. Best-effort
+  // only: a failure here should never block the user from actually being
+  // signed in.
+  useEffect(() => {
+    if (!user || !Capacitor.isNativePlatform() || !BASE) return;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (!token) return;
+        const deviceId = await getDeviceInstallationId();
+        await fetch(`${BASE}/devices/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ device_installation_id: deviceId, platform: currentPlatform() }),
+        });
+      } catch {
+        // Non-fatal — the device just won't show in Settings until the
+        // next successful sign-in.
+      }
+    })();
+  }, [user]);
 
   /**
    * "Remember me" off means the session shouldn't outlive the tab. Supabase
@@ -49,6 +86,69 @@ export function useAuth() {
     await supabase.auth.signOut();
   }
 
+  /** Website side: request a fresh pairing code for the current session. */
+  async function startDeviceLink(): Promise<{ code: string; expires_in: number }> {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) throw new Error("Not signed in.");
+    const resp = await fetch(`${BASE}/devices/link/start`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) throw new Error("Couldn't generate a code. Try again.");
+    return resp.json();
+  }
+
+  /**
+   * Mobile side: exchange a code (typed in by the user) for a real
+   * session. setSession() hands the returned tokens to supabase-js exactly
+   * as if the user had just logged in normally — onAuthStateChange fires
+   * and `user` above updates on its own.
+   */
+  async function linkWithCode(code: string) {
+    if (!BASE) throw new Error("AI backend isn't configured.");
+    const deviceId = await getDeviceInstallationId();
+    const resp = await fetch(`${BASE}/devices/link/consume`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: code.trim(),
+        device_installation_id: deviceId,
+        platform: currentPlatform(),
+      }),
+    });
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => null);
+      throw new Error(body?.detail || "That code didn't work.");
+    }
+    const session = await resp.json();
+    const { error } = await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+    if (error) throw error;
+  }
+
+  async function listDevices(): Promise<LinkedDevice[]> {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return [];
+    const resp = await fetch(`${BASE}/devices`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!resp.ok) return [];
+    return resp.json();
+  }
+
+  async function revokeDevice(deviceId: string) {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return;
+    await fetch(`${BASE}/devices/revoke`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ device_id: deviceId }),
+    });
+  }
+
   return {
     user,
     loading,
@@ -56,6 +156,10 @@ export function useAuth() {
     signInWithEmail,
     signInWithGoogle,
     signOut,
+    startDeviceLink,
+    linkWithCode,
+    listDevices,
+    revokeDevice,
   };
 }
 
@@ -65,5 +169,34 @@ if (typeof window !== "undefined") {
     if (localStorage.getItem(REMEMBER_KEY) === "0") {
       void supabase.auth.signOut({ scope: "local" });
     }
+  });
+}
+
+// A revoked device should notice on its own the next time the app comes
+// to the foreground, since Supabase has no per-device token revocation —
+// see access/devices.py's revoke_device() docstring for why this is a
+// check-in model. Native-only: the website has no concept of a "device"
+// to revoke itself against.
+if (typeof document !== "undefined" && Capacitor.isNativePlatform()) {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || !BASE) return;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (!token) return;
+        const deviceId = await getDeviceInstallationId();
+        const resp = await fetch(
+          `${BASE}/devices/self?device_installation_id=${encodeURIComponent(deviceId)}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (!resp.ok) return;
+        const status = await resp.json();
+        if (status.revoked) await supabase.auth.signOut();
+      } catch {
+        // Best-effort — a failed check just means we try again next
+        // foreground rather than forcing a sign-out on a network blip.
+      }
+    })();
   });
 }

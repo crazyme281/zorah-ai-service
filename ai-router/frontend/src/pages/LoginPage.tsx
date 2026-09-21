@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { IonPage, IonContent, IonInput, IonIcon } from "@ionic/react";
+import { Capacitor } from "@capacitor/core";
 import {
   mailOutline,
   lockClosedOutline,
@@ -7,6 +8,7 @@ import {
   eyeOffOutline,
   checkmarkOutline,
   arrowForwardOutline,
+  keyOutline,
 } from "ionicons/icons";
 import { ZorahLogo } from "../components/ZorahLogo";
 
@@ -14,6 +16,9 @@ interface LoginPageProps {
   onSubmitPassword: (email: string, password: string, remember: boolean) => Promise<void>;
   onSubmitMagicLink: (email: string) => Promise<void>;
   onGoogle: () => Promise<void>;
+  /** Native-only: exchanges a pairing code (typed in from the website's
+   * Settings page) for a real session — see useAuth's linkWithCode. */
+  onLinkWithCode?: (code: string) => Promise<void>;
 }
 
 /** Google's mark, inlined so the button works offline and in the webview. */
@@ -40,7 +45,12 @@ function GoogleMark() {
   );
 }
 
-export function LoginPage({ onSubmitPassword, onSubmitMagicLink, onGoogle }: LoginPageProps) {
+export function LoginPage({
+  onSubmitPassword,
+  onSubmitMagicLink,
+  onGoogle,
+  onLinkWithCode,
+}: LoginPageProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
@@ -48,6 +58,9 @@ export function LoginPage({ onSubmitPassword, onSubmitMagicLink, onGoogle }: Log
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [showCodeEntry, setShowCodeEntry] = useState(false);
+  const [linkCode, setLinkCode] = useState("");
+  const isNative = Capacitor.isNativePlatform();
 
   async function handleLogin() {
     if (busy) return;
@@ -88,6 +101,20 @@ export function LoginPage({ onSubmitPassword, onSubmitMagicLink, onGoogle }: Log
       await onGoogle();
     } catch {
       setError("Google sign-in isn't available right now.");
+      setBusy(false);
+    }
+  }
+
+  async function handleLinkCode() {
+    if (!onLinkWithCode || busy) return;
+    if (linkCode.trim().length < 6) return setError("Enter the 8-character code from the website.");
+    setBusy(true);
+    setError(null);
+    try {
+      await onLinkWithCode(linkCode.trim());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That code didn't work.");
+    } finally {
       setBusy(false);
     }
   }
@@ -159,12 +186,42 @@ export function LoginPage({ onSubmitPassword, onSubmitMagicLink, onGoogle }: Log
             {!busy && <IonIcon icon={arrowForwardOutline} />}
           </button>
 
-          <div className="auth-or">or</div>
+          <div className="auth-or">or register below</div>
 
           <button type="button" className="auth-google" disabled={busy} onClick={handleGoogle}>
             <GoogleMark />
             Continue with Google
           </button>
+
+          {isNative && onLinkWithCode && (
+            <div className="auth-devicelink">
+              {!showCodeEntry ? (
+                <button
+                  type="button"
+                  className="auth-link auth-devicelink__toggle"
+                  onClick={() => setShowCodeEntry(true)}
+                >
+                  <IonIcon icon={keyOutline} />
+                  Have a code from the website? Link this device
+                </button>
+              ) : (
+                <div className="auth-field">
+                  <IonIcon icon={keyOutline} />
+                  <IonInput
+                    placeholder="8-character code"
+                    value={linkCode}
+                    maxlength={8}
+                    onIonInput={(e) => setLinkCode((e.detail.value ?? "").toUpperCase())}
+                    onKeyDown={(e) => e.key === "Enter" && handleLinkCode()}
+                    aria-label="Device link code"
+                  />
+                  <button type="button" className="auth-field__toggle" onClick={handleLinkCode}>
+                    <IonIcon icon={arrowForwardOutline} />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {error && <p className="auth-note auth-note--error">{error}</p>}
           {notice && <p className="auth-note auth-note--ok">{notice}</p>}
@@ -172,7 +229,7 @@ export function LoginPage({ onSubmitPassword, onSubmitMagicLink, onGoogle }: Log
           <p className="auth-foot">
             Don&rsquo;t have an account?{" "}
             <a className="auth-link" href="mailto:admin@zorah.ai">
-              Contact admin
+              create an account
             </a>
           </p>
         </div>

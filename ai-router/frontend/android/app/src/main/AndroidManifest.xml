@@ -38,4 +38,10 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Required since Android 8 (API 26) to open the package installer
+         for a specific APK from within the app — without it, the OS
+         shows the user a one-time "allow installs from this app" prompt
+         the first time ApkInstallerPlugin.install() runs, which is the
+         expected standard flow, not something to bypass. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 </manifest>
