@@ -19,6 +19,10 @@ interface LoginPageProps {
   /** Native-only: exchanges a pairing code (typed in from the website's
    * Settings page) for a real session — see useAuth's linkWithCode. */
   onLinkWithCode?: (code: string) => Promise<void>;
+  /** Swaps this screen for RegisterPage — a plain state toggle in
+   * App.tsx, not a route, matching how this screen itself has no route
+   * of its own pre-login. */
+  onShowRegister: () => void;
 }
 
 /** Google's mark, inlined so the button works offline and in the webview. */
@@ -50,6 +54,7 @@ export function LoginPage({
   onSubmitMagicLink,
   onGoogle,
   onLinkWithCode,
+  onShowRegister,
 }: LoginPageProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -186,7 +191,7 @@ export function LoginPage({
             {!busy && <IonIcon icon={arrowForwardOutline} />}
           </button>
 
-          <div className="auth-or">or register below</div>
+          <div className="auth-or">or</div>
 
           <button type="button" className="auth-google" disabled={busy} onClick={handleGoogle}>
             <GoogleMark />
@@ -228,9 +233,9 @@ export function LoginPage({
 
           <p className="auth-foot">
             Don&rsquo;t have an account?{" "}
-            <a className="auth-link" href="mailto:admin@zorah.ai">
-              create an account
-            </a>
+            <button type="button" className="auth-link" onClick={onShowRegister}>
+              Create an Account
+            </button>
           </p>
         </div>
       </IonContent>

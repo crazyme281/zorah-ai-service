@@ -11,6 +11,7 @@ import { IconRail } from "./components/IconRail";
 import { SplashScreen } from "./components/SplashScreen";
 import { ChatPage } from "./pages/ChatPage";
 import { LoginPage } from "./pages/LoginPage";
+import { RegisterPage } from "./pages/RegisterPage";
 import { ImagesPage, HistoryPage, SettingsPage } from "./pages/SectionPages";
 import { CodeFixerPage } from "./pages/CodeFixerPage";
 import { UpgradePage } from "./pages/UpgradePage";
@@ -25,6 +26,7 @@ export default function App() {
     user,
     loading: authLoading,
     signInWithPassword,
+    signUpWithPassword,
     signInWithEmail,
     signInWithGoogle,
     signOut,
@@ -36,6 +38,11 @@ export default function App() {
   const [splashDone, setSplashDone] = useState(false);
   const [splashGone, setSplashGone] = useState(false);
   const [pendingRedirect, setPendingRedirect] = useState<string | null>(null);
+  // Pre-login state toggle rather than a route — mirrors how the login
+  // screen itself has never had a URL route of its own (see the
+  // ready && (!user ? ... ) branch below, which sits outside
+  // IonReactRouter entirely).
+  const [showRegister, setShowRegister] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setSplashDone(true), SPLASH_MS);
@@ -75,12 +82,21 @@ export default function App() {
 
       {ready &&
         (!user ? (
-          <LoginPage
-            onSubmitPassword={signInWithPassword}
-            onSubmitMagicLink={signInWithEmail}
-            onGoogle={signInWithGoogle}
-            onLinkWithCode={linkWithCode}
-          />
+          showRegister ? (
+            <RegisterPage
+              onRegister={signUpWithPassword}
+              onGoogle={() => signInWithGoogle(true)}
+              onBackToLogin={() => setShowRegister(false)}
+            />
+          ) : (
+            <LoginPage
+              onSubmitPassword={signInWithPassword}
+              onSubmitMagicLink={signInWithEmail}
+              onGoogle={signInWithGoogle}
+              onLinkWithCode={linkWithCode}
+              onShowRegister={() => setShowRegister(true)}
+            />
+          )
         ) : (
           <IonReactRouter>
             <AppMenu

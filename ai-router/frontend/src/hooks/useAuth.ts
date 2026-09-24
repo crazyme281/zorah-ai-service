@@ -67,16 +67,49 @@ export function useAuth() {
     localStorage.setItem(REMEMBER_KEY, remember ? "1" : "0");
   }
 
+  /**
+   * New-account registration. Supabase's own signUp call is what
+   * prevents duplicate accounts — it errors on an email that already
+   * exists rather than silently creating a second one, so there's
+   * nothing extra to check here for that.
+   *
+   * The new user's profiles row (tier=FREE, role=user) isn't created
+   * here — it doesn't need to be. access/tiers.py's get_profile()
+   * lazily creates that row with exactly those defaults the first time
+   * anything checks this user's tier/role, which happens automatically
+   * once they're in the app. New users are never granted admin — role
+   * only ever becomes 'admin' via a direct database update, never
+   * through any signup path.
+   */
+  async function signUpWithPassword(email: string, password: string): Promise<{ needsConfirmation: boolean }> {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+    // If this Supabase project requires email confirmation, signUp
+    // returns a user but no session yet — session stays null until they
+    // click the link in their inbox.
+    return { needsConfirmation: data.session === null };
+  }
+
   /** Magic link — also backs the "Forgot password?" action on the login page. */
   async function signInWithEmail(email: string) {
     const { error } = await supabase.auth.signInWithOtp({ email });
     if (error) throw error;
   }
 
-  async function signInWithGoogle() {
+  /**
+   * forceAccountSelection is passed as true from the registration
+   * screen — Google otherwise silently reuses whatever account last
+   * signed in on this device, which is the wrong default when someone
+   * is deliberately trying to register with a different account. Plain
+   * login keeps calling this with no argument, unchanged.
+   */
+  async function signInWithGoogle(forceAccountSelection = false) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: window.location.origin },
+      options: {
+        redirectTo: window.location.origin,
+        ...(forceAccountSelection ? { queryParams: { prompt: "select_account" } } : {}),
+      },
     });
     if (error) throw error;
   }
@@ -153,6 +186,7 @@ export function useAuth() {
     user,
     loading,
     signInWithPassword,
+    signUpWithPassword,
     signInWithEmail,
     signInWithGoogle,
     signOut,

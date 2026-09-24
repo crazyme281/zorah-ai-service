@@ -165,7 +165,7 @@ export function UpgradePage() {
             </button>
           )}
 
-          <p className="upgrade__note">Secure payment, powered by Flutterwave.</p>
+          <p className="upgrade__note">Secure payment, powered by NextGen.</p>
         </div>
       </IonContent>
     </IonPage>
