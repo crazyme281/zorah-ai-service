@@ -31,6 +31,13 @@ class Entitlements:
     can_generate_pdf: bool
     can_generate_docx: bool
     higher_reasoning: bool
+    # Go and above — matches every other Go-tier perk in this table
+    # (can_use_groq_fast_lane is also True for both GO and PRO, never
+    # GO-only). "Available only to Go users" in the spec reads as "Go
+    # tier and up," not "Go tier exclusively" — PRO strictly contains
+    # everything GO has everywhere else in this table, and there's no
+    # stated reason Teaching should be the one exception.
+    can_use_teaching: bool
 
 
 ENTITLEMENTS = {
@@ -42,6 +49,7 @@ ENTITLEMENTS = {
         can_generate_pdf=False,
         can_generate_docx=False,
         higher_reasoning=False,
+        can_use_teaching=False,
     ),
     Tier.GO: Entitlements(
         daily_image_uploads=10,
@@ -51,6 +59,7 @@ ENTITLEMENTS = {
         can_generate_pdf=False,
         can_generate_docx=False,
         higher_reasoning=False,
+        can_use_teaching=True,
     ),
     Tier.PRO: Entitlements(
         daily_image_uploads=15,
@@ -60,6 +69,7 @@ ENTITLEMENTS = {
         can_generate_pdf=True,
         can_generate_docx=True,
         higher_reasoning=True,
+        can_use_teaching=True,
     ),
 }
 
@@ -121,11 +131,17 @@ class SubscriptionStore:
         return tier
 
     def status_for(self, user_id: str) -> dict:
-        """What the frontend needs to render plan/expiration state."""
+        """What the frontend needs to render plan/expiration state, plus
+        the account's role — added so the frontend can decide whether to
+        show the admin dashboard without a second round trip. The actual
+        security boundary for admin routes is server-side (require_admin
+        in api.py, re-checked on every call) — this is purely for the
+        UI to know what to show."""
         profile = self.get_profile(user_id)
         tier = self.get_tier(user_id)  # runs the expiration check first
         return {
             "tier": tier.value,
+            "role": profile.get("role", "user"),
             "subscription_status": profile.get("subscription_status", "none"),
             "subscription_expiration": profile.get("subscription_expiration"),
             "grace_period_expiration": profile.get("grace_period_expiration"),

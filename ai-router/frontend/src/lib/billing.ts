@@ -6,6 +6,7 @@ export type Tier = "FREE" | "GO" | "PRO";
 
 export interface PlanStatus {
   tier: Tier;
+  role: "user" | "admin";
   subscription_status: string;
   subscription_expiration: string | null;
   grace_period_expiration: string | null;

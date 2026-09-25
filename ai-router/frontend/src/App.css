@@ -2390,3 +2390,87 @@ ion-item:hover .chat-delete-icon {
   font-size: 0.78rem;
   color: var(--zr-text-faint);
 }
+/* -------------------------------------------------------- Admin dashboard -- */
+
+.admin-dash {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px 18px 60px;
+}
+
+.admin-dash__header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.admin-dash__header > ion-icon {
+  font-size: 30px;
+  color: var(--zr-gold);
+}
+
+.admin-dash__header h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.18rem;
+  font-weight: 600;
+  color: var(--zr-text);
+}
+
+.admin-dash__header p {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  color: var(--zr-text-dim);
+}
+
+.admin-dash__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-dash__card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--zr-line);
+  border-radius: var(--zr-radius);
+  background: var(--zr-panel);
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-dash__card:hover {
+  border-color: var(--zr-line-gold);
+  background: var(--zr-gold-wash);
+}
+
+.admin-dash__card-icon {
+  font-size: 22px;
+  color: var(--zr-gold-bright);
+  flex-shrink: 0;
+}
+
+.admin-dash__card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-dash__card-body b {
+  font-size: 0.94rem;
+  color: var(--zr-text);
+}
+
+.admin-dash__card-body span {
+  font-size: 0.82rem;
+  color: var(--zr-text-dim);
+}
+
+.admin-dash__card-chevron {
+  font-size: 16px;
+  color: var(--zr-text-faint);
+}
