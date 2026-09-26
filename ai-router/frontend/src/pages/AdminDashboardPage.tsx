@@ -20,7 +20,7 @@ export function AdminDashboardPage() {
 
   return (
     <IonPage>
-      <TopBar />
+      <TopBar admin />
       <IonContent className="panel-page">
         <div className="admin-dash">
           <div className="admin-dash__header">

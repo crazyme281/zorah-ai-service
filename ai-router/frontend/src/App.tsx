@@ -36,7 +36,8 @@ export default function App() {
   } = useAuth();
   const { projects, createProject } = useProjects(user?.id);
   const { conversations, createConversation, deleteConversation } = useConversations(user?.id);
-  const { plan } = usePlan();
+  const { plan, loading: planLoading } = usePlan();
+  const isAdmin = plan?.role === "admin";
 
   const [splashDone, setSplashDone] = useState(false);
   const [splashGone, setSplashGone] = useState(false);
@@ -80,14 +81,18 @@ export default function App() {
   }, [pendingRedirect]);
 
   const showSplash = !splashGone;
-  const ready = splashDone && !authLoading;
+  // Waiting on planLoading too (when there's a user) means the app
+  // never flashes the full user shell for an admin account before
+  // swapping to the admin-only one below — the role has to be known
+  // before we pick which shell to render at all.
+  const ready = splashDone && !authLoading && (!user || !planLoading);
 
   useEffect(() => {
-    if (ready && user && plan?.role === "admin" && !adminLanded) {
+    if (ready && user && isAdmin && !adminLanded) {
       setAdminLanded(true);
       setPendingRedirect("/admin");
     }
-  }, [ready, user, plan, adminLanded]);
+  }, [ready, user, isAdmin, adminLanded]);
 
   async function handleNewChat(projectId: string | null) {
     const chat = await createConversation(projectId);
@@ -119,6 +124,23 @@ export default function App() {
               onShowRegister={() => setShowRegister(true)}
             />
           )
+        ) : isAdmin ? (
+          // Admin accounts get nothing but the dashboard and the APK
+          // manager — no chat drawer, no icon rail, no chat/images/code/
+          // history/settings/upgrade routes. Any other path (including a
+          // stale deep link) falls through the trailing wildcard back to
+          // /admin, so there's no user-facing page an admin can land on.
+          <IonReactRouter>
+            <div className="app-shell">
+              <div className="app-shell__main">
+                <IonRouterOutlet id="main-content">
+                  <Route exact path="/admin" component={AdminDashboardPage} />
+                  <Route exact path="/admin/apk" component={AdminApkPage} />
+                  <Route render={() => <Redirect to="/admin" />} />
+                </IonRouterOutlet>
+              </div>
+            </div>
+          </IonReactRouter>
         ) : (
           <IonReactRouter>
             <AppMenu
@@ -140,12 +162,11 @@ export default function App() {
                   <Route exact path="/code" component={CodeFixerPage} />
                   <Route exact path="/history" component={HistoryPage} />
                   <Route exact path="/settings" component={SettingsPage} />
-                  <Route exact path="/admin" component={AdminDashboardPage} />
-                  <Route exact path="/admin/apk" component={AdminApkPage} />
                   <Route exact path="/upgrade" component={UpgradePage} />
                   <Route exact path="/">
                     {pendingRedirect ? <Redirect to={pendingRedirect} /> : <ChatPage />}
                   </Route>
+                  <Route render={() => <Redirect to="/" />} />
                 </IonRouterOutlet>
               </div>
             </div>

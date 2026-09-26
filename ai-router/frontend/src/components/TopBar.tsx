@@ -10,26 +10,34 @@ import {
   IonIcon,
   useIonRouter,
 } from "@ionic/react";
-import { personOutline, sparklesOutline } from "ionicons/icons";
+import { personOutline, sparklesOutline, logOutOutline } from "ionicons/icons";
 import { ZorahLogo } from "./ZorahLogo";
 import { usePlan } from "../hooks/usePlan";
+import { useAuth } from "../hooks/useAuth";
 
-export function TopBar({ online = true }: { online?: boolean }) {
+/**
+ * `admin` renders the header for the admin-only shell: no hamburger
+ * (there's no chat drawer to open there), no upgrade pill (admins
+ * aren't on a paid-tier ladder), and the avatar button signs out
+ * directly instead of linking to /settings, which doesn't exist for
+ * admins — see App.tsx's admin branch for the routes this pairs with.
+ */
+export function TopBar({ online = true, admin = false }: { online?: boolean; admin?: boolean }) {
   const router = useIonRouter();
   const { plan } = usePlan();
+  const { signOut } = useAuth();
 
   // FREE -> "Get Go", GO -> "Get Pro", PRO -> no button at all, matching
   // the reference design exactly (each tier's header only ever offers
   // the next step up, never skips one, never shows once there's nowhere
   // higher to go).
-  const upgradeLabel = plan?.tier === "GO" ? "Get Pro" : plan?.tier === "PRO" ? null : "Get Go";
+  const upgradeLabel =
+    admin ? null : plan?.tier === "GO" ? "Get Pro" : plan?.tier === "PRO" ? null : "Get Go";
 
   return (
     <IonHeader className="ion-no-border">
       <IonToolbar className="zr-toolbar">
-        <IonButtons slot="start">
-          <IonMenuButton menu="app-menu" />
-        </IonButtons>
+        <IonButtons slot="start">{!admin && <IonMenuButton menu="app-menu" />}</IonButtons>
 
         <div className="topbar-brand">
           <ZorahLogo size={28} />
@@ -54,10 +62,10 @@ export function TopBar({ online = true }: { online?: boolean }) {
           <button
             type="button"
             className="avatar-btn"
-            aria-label="Account settings"
-            onClick={() => router.push("/settings", "none", "replace")}
+            aria-label={admin ? "Sign out" : "Account settings"}
+            onClick={() => (admin ? signOut() : router.push("/settings", "none", "replace"))}
           >
-            <IonIcon icon={personOutline} />
+            <IonIcon icon={admin ? logOutOutline : personOutline} />
           </button>
         </IonButtons>
       </IonToolbar>

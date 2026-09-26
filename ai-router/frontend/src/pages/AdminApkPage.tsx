@@ -126,7 +126,7 @@ export function AdminApkPage() {
 
   return (
     <IonPage>
-      <TopBar />
+      <TopBar admin />
       <IonContent className="panel-page">
         <div className="settings-group admin-apk">
           <h3>APK Release</h3>
