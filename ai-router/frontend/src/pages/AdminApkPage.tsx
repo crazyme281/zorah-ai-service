@@ -75,6 +75,7 @@ export function AdminApkPage() {
   }, []);
 
   async function handleUpload(file: File) {
+    console.info("[admin-apk] upload starting:", file.name, file.size, "bytes");
     if (!file.name.toLowerCase().endsWith(".apk")) {
       setError("Only .apk files are accepted.");
       return;
@@ -86,6 +87,7 @@ export function AdminApkPage() {
     setDownloadState("idle");
     try {
       const headers = await authHeader();
+      console.info("[admin-apk] got auth header, opening request to", `${BASE}/admin/apk/upload`);
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", `${BASE}/admin/apk/upload`);
@@ -94,6 +96,7 @@ export function AdminApkPage() {
           if (e.lengthComputable) setUploadPercent(Math.round((e.loaded / e.total) * 100));
         };
         xhr.onload = () => {
+          console.info("[admin-apk] request completed with status", xhr.status);
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve();
             return;
@@ -106,10 +109,14 @@ export function AdminApkPage() {
           }
           reject(new Error(detail));
         };
-        xhr.onerror = () => reject(new Error("Upload failed — check your connection."));
+        xhr.onerror = () => {
+          console.error("[admin-apk] xhr network error — request never reached the server");
+          reject(new Error("Upload failed — check your connection."));
+        };
         const form = new FormData();
         form.append("file", file);
         xhr.send(form);
+        console.info("[admin-apk] xhr.send() called");
       });
       await refresh();
       setJustUploaded(true);
@@ -127,6 +134,7 @@ export function AdminApkPage() {
         setDownloadState("failed");
       }
     } catch (e) {
+      console.error("[admin-apk] upload failed:", e);
       setError(e instanceof Error ? e.message : "Upload failed.");
     } finally {
       setUploading(false);
@@ -257,7 +265,13 @@ export function AdminApkPage() {
                     <p>No current APK. Upload one to make it available to users.</p>
                     <button
                       type="button"
-                      onClick={() => fileRef.current?.click()}
+                      onClick={() => {
+                        if (!fileRef.current) {
+                          setError("File picker isn't ready — reload the page and try again.");
+                          return;
+                        }
+                        fileRef.current.click();
+                      }}
                       disabled={uploading}
                     >
                       {uploading ? `Uploading… ${uploadPercent}%` : "Upload APK"}
@@ -280,12 +294,24 @@ export function AdminApkPage() {
         <input
           ref={fileRef}
           type="file"
-          accept=".apk"
+          // Some OS/browser file-picker dialogs treat an extension-only
+          // accept value unreliably for a package type they don't have a
+          // registered handler for, silently showing nothing selectable.
+          // Naming the actual MIME type too makes the picker's filter
+          // match on more platforms.
+          accept=".apk,application/vnd.android.package-archive"
           hidden
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) handleUpload(file);
             e.target.value = "";
+            if (!file) return;
+            handleUpload(file).catch((err) => {
+              // handleUpload already sets its own error state internally
+              // for every failure path it knows about — this only fires
+              // if something throws outside that (a bug in handleUpload
+              // itself), so it's a last-resort net, not the primary path.
+              setError(err instanceof Error ? err.message : "Upload failed unexpectedly.");
+            });
           }}
         />
       </IonContent>
