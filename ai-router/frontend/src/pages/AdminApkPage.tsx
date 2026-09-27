@@ -1,15 +1,18 @@
 /**
- * Admin-only APK management — one of the two pages in the admin-only
- * shell (see App.tsx), reachable at /admin/apk on both the website and
- * the mobile app. No nav link anywhere outside the admin shell points
- * here — the real access boundary is server-side (require_admin in
- * api.py, checking profiles.role fresh on every call), which is what
- * actually stops a non-admin from using these endpoints even if they
- * discover the URL.
+ * Admin-only APK management. Reachable at /admin/apk — no nav link
+ * anywhere in the app links here, on purpose; an admin navigates to it
+ * directly. That's obscurity, not security: the real boundary is
+ * server-side (require_admin in api.py, checking profiles.role fresh on
+ * every call), which is what actually stops a non-admin from using these
+ * endpoints even if they discover the URL.
+ *
+ * Works on both web and the native app — admin access isn't
+ * web-only. There's still no nav link to this page anywhere; an admin
+ * reaches it by navigating here directly, same as before.
  */
 import { useEffect, useRef, useState } from "react";
-import { IonPage, IonContent, IonIcon, IonSpinner, IonProgressBar } from "@ionic/react";
-import { cloudUploadOutline, cloudDownloadOutline, trashOutline, checkmarkCircleOutline } from "ionicons/icons";
+import { IonPage, IonContent, IonIcon, IonSpinner } from "@ionic/react";
+import { cloudUploadOutline, trashOutline, checkmarkCircleOutline, downloadOutline } from "ionicons/icons";
 import { TopBar } from "../components/TopBar";
 import { supabase } from "../lib/supabase";
 import { getApp } from "../lib/apk";
@@ -46,13 +49,9 @@ export function AdminApkPage() {
   const [status, setStatus] = useState<"loading" | "forbidden" | "ready">("loading");
   const [release, setRelease] = useState<AdminApkRelease | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadPercent, setUploadPercent] = useState(0);
   const [deleting, setDeleting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [justUploaded, setJustUploaded] = useState(false);
-  const [downloadState, setDownloadState] = useState<
-    "idle" | "downloading" | "done" | "failed"
-  >("idle");
 
   async function refresh() {
     try {
@@ -75,70 +74,55 @@ export function AdminApkPage() {
   }, []);
 
   async function handleUpload(file: File) {
-    console.info("[admin-apk] upload starting:", file.name, file.size, "bytes");
     if (!file.name.toLowerCase().endsWith(".apk")) {
       setError("Only .apk files are accepted.");
       return;
     }
     setUploading(true);
-    setUploadPercent(0);
     setError(null);
-    setJustUploaded(false);
-    setDownloadState("idle");
     try {
-      const headers = await authHeader();
-      console.info("[admin-apk] got auth header, opening request to", `${BASE}/admin/apk/upload`);
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", `${BASE}/admin/apk/upload`);
-        for (const [key, value] of Object.entries(headers)) xhr.setRequestHeader(key, value);
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) setUploadPercent(Math.round((e.loaded / e.total) * 100));
-        };
-        xhr.onload = () => {
-          console.info("[admin-apk] request completed with status", xhr.status);
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve();
-            return;
-          }
-          let detail = "Upload failed.";
-          try {
-            detail = JSON.parse(xhr.responseText)?.detail || detail;
-          } catch {
-            // Non-JSON error body — fall back to the generic message.
-          }
-          reject(new Error(detail));
-        };
-        xhr.onerror = () => {
-          console.error("[admin-apk] xhr network error — request never reached the server");
-          reject(new Error("Upload failed — check your connection."));
-        };
-        const form = new FormData();
-        form.append("file", file);
-        xhr.send(form);
-        console.info("[admin-apk] xhr.send() called");
+      const form = new FormData();
+      form.append("file", file);
+      const resp = await fetch(`${BASE}/admin/apk/upload`, {
+        method: "POST",
+        headers: await authHeader(),
+        body: form,
       });
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => null);
+        throw new Error(body?.detail || "Upload failed.");
+      }
       await refresh();
-      setJustUploaded(true);
-      setTimeout(() => setJustUploaded(false), 4000);
 
-      // The upload itself already succeeded (the release row exists) —
-      // this is a best-effort convenience on top of it, so a failure
-      // here is reported separately and never rolls back or re-throws
-      // into the upload's own error state.
-      setDownloadState("downloading");
+      // Auto-download a copy to the uploading admin's own device. A
+      // failure here is deliberately non-fatal and shown separately —
+      // the upload itself already succeeded (confirmed by the backend
+      // response above), so this shouldn't read as "the upload failed."
       try {
         await getApp();
-        setDownloadState("done");
-      } catch {
-        setDownloadState("failed");
+      } catch (e) {
+        setError(
+          `Uploaded successfully, but couldn't auto-download a copy: ${
+            e instanceof Error ? e.message : "unknown error"
+          }. Use the Download button below to get it manually.`,
+        );
       }
     } catch (e) {
-      console.error("[admin-apk] upload failed:", e);
       setError(e instanceof Error ? e.message : "Upload failed.");
     } finally {
       setUploading(false);
-      setUploadPercent(0);
+    }
+  }
+
+  async function handleDownloadToDevice() {
+    setDownloading(true);
+    setError(null);
+    try {
+      await getApp();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't start the download.");
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -181,30 +165,6 @@ export function AdminApkPage() {
 
           {status === "ready" && (
             <>
-              {justUploaded && (
-                <p className="admin-apk__success">
-                  <IonIcon icon={checkmarkCircleOutline} /> APK uploaded — it's now available to
-                  users.
-                </p>
-              )}
-
-              {downloadState === "downloading" && (
-                <p className="admin-apk__success admin-apk__success--muted">
-                  <IonSpinner name="crescent" /> Downloading the APK to this device…
-                </p>
-              )}
-              {downloadState === "done" && (
-                <p className="admin-apk__success">
-                  <IonIcon icon={checkmarkCircleOutline} /> Downloaded to this device.
-                </p>
-              )}
-              {downloadState === "failed" && (
-                <p className="admin-apk__error">
-                  Upload succeeded, but the automatic download to this device failed — use the
-                  file below to get it manually.
-                </p>
-              )}
-
               {release ? (
                 <div className="settings-card">
                   <div className="settings-row">
@@ -232,22 +192,10 @@ export function AdminApkPage() {
                     <span>{new Date(release.uploaded_at).toLocaleString()}</span>
                   </div>
                   <div className="settings-row">
-                    Get it on this device
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setDownloadState("downloading");
-                        try {
-                          await getApp();
-                          setDownloadState("done");
-                        } catch {
-                          setDownloadState("failed");
-                        }
-                      }}
-                      disabled={downloadState === "downloading"}
-                    >
-                      <IonIcon icon={cloudDownloadOutline} />
-                      {downloadState === "downloading" ? "Downloading…" : "Download"}
+                    Download a copy to this device
+                    <button type="button" onClick={handleDownloadToDevice} disabled={downloading}>
+                      <IonIcon icon={downloadOutline} />
+                      {downloading ? "Starting…" : "Download"}
                     </button>
                   </div>
                   <div className="settings-row">
@@ -265,23 +213,11 @@ export function AdminApkPage() {
                     <p>No current APK. Upload one to make it available to users.</p>
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!fileRef.current) {
-                          setError("File picker isn't ready — reload the page and try again.");
-                          return;
-                        }
-                        fileRef.current.click();
-                      }}
+                      onClick={() => fileRef.current?.click()}
                       disabled={uploading}
                     >
-                      {uploading ? `Uploading… ${uploadPercent}%` : "Upload APK"}
+                      {uploading ? <IonSpinner name="crescent" /> : "Upload APK"}
                     </button>
-                    {uploading && (
-                      <IonProgressBar
-                        className="admin-apk__progress"
-                        value={uploadPercent / 100}
-                      />
-                    )}
                   </div>
                 </div>
               )}
@@ -294,24 +230,12 @@ export function AdminApkPage() {
         <input
           ref={fileRef}
           type="file"
-          // Some OS/browser file-picker dialogs treat an extension-only
-          // accept value unreliably for a package type they don't have a
-          // registered handler for, silently showing nothing selectable.
-          // Naming the actual MIME type too makes the picker's filter
-          // match on more platforms.
-          accept=".apk,application/vnd.android.package-archive"
+          accept=".apk"
           hidden
           onChange={(e) => {
             const file = e.target.files?.[0];
+            if (file) handleUpload(file);
             e.target.value = "";
-            if (!file) return;
-            handleUpload(file).catch((err) => {
-              // handleUpload already sets its own error state internally
-              // for every failure path it knows about — this only fires
-              // if something throws outside that (a bug in handleUpload
-              // itself), so it's a last-resort net, not the primary path.
-              setError(err instanceof Error ? err.message : "Upload failed unexpectedly.");
-            });
           }}
         />
       </IonContent>
