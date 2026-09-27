@@ -1,21 +1,18 @@
 /**
- * Admin-only APK management. Reachable at /admin/apk — no nav link
- * anywhere in the app links here, on purpose; an admin navigates to it
- * directly. That's obscurity, not security: the real boundary is
- * server-side (require_admin in api.py, checking profiles.role fresh on
- * every call), which is what actually stops a non-admin from using these
- * endpoints even if they discover the URL.
- *
- * Redirects away entirely on the native app — "admin exists only on the
- * web" is enforced here at the route level, on top of there being no
- * link to it anywhere a mobile user would find it.
+ * Admin-only APK management — one of the two pages in the admin-only
+ * shell (see App.tsx), reachable at /admin/apk on both the website and
+ * the mobile app. No nav link anywhere outside the admin shell points
+ * here — the real access boundary is server-side (require_admin in
+ * api.py, checking profiles.role fresh on every call), which is what
+ * actually stops a non-admin from using these endpoints even if they
+ * discover the URL.
  */
 import { useEffect, useRef, useState } from "react";
-import { useIonRouter, IonPage, IonContent, IonIcon, IonSpinner } from "@ionic/react";
-import { Capacitor } from "@capacitor/core";
-import { cloudUploadOutline, trashOutline, checkmarkCircleOutline } from "ionicons/icons";
+import { IonPage, IonContent, IonIcon, IonSpinner, IonProgressBar } from "@ionic/react";
+import { cloudUploadOutline, cloudDownloadOutline, trashOutline, checkmarkCircleOutline } from "ionicons/icons";
 import { TopBar } from "../components/TopBar";
 import { supabase } from "../lib/supabase";
+import { getApp } from "../lib/apk";
 
 const BASE = import.meta.env.VITE_AI_BACKEND_URL;
 
@@ -44,20 +41,18 @@ async function authHeader(): Promise<Record<string, string>> {
 }
 
 export function AdminApkPage() {
-  const router = useIonRouter();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [status, setStatus] = useState<"loading" | "forbidden" | "ready">("loading");
   const [release, setRelease] = useState<AdminApkRelease | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadPercent, setUploadPercent] = useState(0);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      router.push("/", "none", "replace");
-    }
-  }, [router]);
+  const [justUploaded, setJustUploaded] = useState(false);
+  const [downloadState, setDownloadState] = useState<
+    "idle" | "downloading" | "done" | "failed"
+  >("idle");
 
   async function refresh() {
     try {
@@ -85,24 +80,57 @@ export function AdminApkPage() {
       return;
     }
     setUploading(true);
+    setUploadPercent(0);
     setError(null);
+    setJustUploaded(false);
+    setDownloadState("idle");
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const resp = await fetch(`${BASE}/admin/apk/upload`, {
-        method: "POST",
-        headers: await authHeader(),
-        body: form,
+      const headers = await authHeader();
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `${BASE}/admin/apk/upload`);
+        for (const [key, value] of Object.entries(headers)) xhr.setRequestHeader(key, value);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) setUploadPercent(Math.round((e.loaded / e.total) * 100));
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+            return;
+          }
+          let detail = "Upload failed.";
+          try {
+            detail = JSON.parse(xhr.responseText)?.detail || detail;
+          } catch {
+            // Non-JSON error body — fall back to the generic message.
+          }
+          reject(new Error(detail));
+        };
+        xhr.onerror = () => reject(new Error("Upload failed — check your connection."));
+        const form = new FormData();
+        form.append("file", file);
+        xhr.send(form);
       });
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => null);
-        throw new Error(body?.detail || "Upload failed.");
-      }
       await refresh();
+      setJustUploaded(true);
+      setTimeout(() => setJustUploaded(false), 4000);
+
+      // The upload itself already succeeded (the release row exists) —
+      // this is a best-effort convenience on top of it, so a failure
+      // here is reported separately and never rolls back or re-throws
+      // into the upload's own error state.
+      setDownloadState("downloading");
+      try {
+        await getApp();
+        setDownloadState("done");
+      } catch {
+        setDownloadState("failed");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed.");
     } finally {
       setUploading(false);
+      setUploadPercent(0);
     }
   }
 
@@ -145,6 +173,30 @@ export function AdminApkPage() {
 
           {status === "ready" && (
             <>
+              {justUploaded && (
+                <p className="admin-apk__success">
+                  <IonIcon icon={checkmarkCircleOutline} /> APK uploaded — it's now available to
+                  users.
+                </p>
+              )}
+
+              {downloadState === "downloading" && (
+                <p className="admin-apk__success admin-apk__success--muted">
+                  <IonSpinner name="crescent" /> Downloading the APK to this device…
+                </p>
+              )}
+              {downloadState === "done" && (
+                <p className="admin-apk__success">
+                  <IonIcon icon={checkmarkCircleOutline} /> Downloaded to this device.
+                </p>
+              )}
+              {downloadState === "failed" && (
+                <p className="admin-apk__error">
+                  Upload succeeded, but the automatic download to this device failed — use the
+                  file below to get it manually.
+                </p>
+              )}
+
               {release ? (
                 <div className="settings-card">
                   <div className="settings-row">
@@ -172,6 +224,25 @@ export function AdminApkPage() {
                     <span>{new Date(release.uploaded_at).toLocaleString()}</span>
                   </div>
                   <div className="settings-row">
+                    Get it on this device
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setDownloadState("downloading");
+                        try {
+                          await getApp();
+                          setDownloadState("done");
+                        } catch {
+                          setDownloadState("failed");
+                        }
+                      }}
+                      disabled={downloadState === "downloading"}
+                    >
+                      <IonIcon icon={cloudDownloadOutline} />
+                      {downloadState === "downloading" ? "Downloading…" : "Download"}
+                    </button>
+                  </div>
+                  <div className="settings-row">
                     Delete before uploading a new version
                     <button type="button" onClick={handleDelete} disabled={deleting}>
                       <IonIcon icon={trashOutline} />
@@ -189,8 +260,14 @@ export function AdminApkPage() {
                       onClick={() => fileRef.current?.click()}
                       disabled={uploading}
                     >
-                      {uploading ? <IonSpinner name="crescent" /> : "Upload APK"}
+                      {uploading ? `Uploading… ${uploadPercent}%` : "Upload APK"}
                     </button>
+                    {uploading && (
+                      <IonProgressBar
+                        className="admin-apk__progress"
+                        value={uploadPercent / 100}
+                      />
+                    )}
                   </div>
                 </div>
               )}

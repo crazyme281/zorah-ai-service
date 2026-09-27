@@ -47,11 +47,6 @@ export default function App() {
   // ready && (!user ? ... ) branch below, which sits outside
   // IonReactRouter entirely).
   const [showRegister, setShowRegister] = useState(false);
-  // Fires once per session, not on every visit to "/" — an admin who
-  // navigates back to Chat on their own shouldn't get bounced straight
-  // back to the dashboard every time. Reuses the existing pendingRedirect
-  // mechanism rather than adding a second redirect path.
-  const [adminLanded, setAdminLanded] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setSplashDone(true), SPLASH_MS);
@@ -73,26 +68,11 @@ export default function App() {
     }
   }, [pendingRedirect]);
 
-  useEffect(() => {
-    if (pendingRedirect) {
-      const t = setTimeout(() => setPendingRedirect(null), 50);
-      return () => clearTimeout(t);
-    }
-  }, [pendingRedirect]);
-
   const showSplash = !splashGone;
-  // Waiting on planLoading too (when there's a user) means the app
-  // never flashes the full user shell for an admin account before
-  // swapping to the admin-only one below — the role has to be known
-  // before we pick which shell to render at all.
+  // Waiting on planLoading too (once there's a user) means the role is
+  // always known before either shell below ever renders a single frame —
+  // an admin account never flashes the normal chat interface first.
   const ready = splashDone && !authLoading && (!user || !planLoading);
-
-  useEffect(() => {
-    if (ready && user && isAdmin && !adminLanded) {
-      setAdminLanded(true);
-      setPendingRedirect("/admin");
-    }
-  }, [ready, user, isAdmin, adminLanded]);
 
   async function handleNewChat(projectId: string | null) {
     const chat = await createConversation(projectId);
@@ -125,11 +105,13 @@ export default function App() {
             />
           )
         ) : isAdmin ? (
-          // Admin accounts get nothing but the dashboard and the APK
-          // manager — no chat drawer, no icon rail, no chat/images/code/
-          // history/settings/upgrade routes. Any other path (including a
-          // stale deep link) falls through the trailing wildcard back to
-          // /admin, so there's no user-facing page an admin can land on.
+          // Admin accounts land on the Admin Dashboard directly — the
+          // normal chat interface is never mounted for them at all, not
+          // just redirected away from after a flash. From here they only
+          // reach other admin pages (currently just APK management) by
+          // navigating within the panel itself (see AdminDashboardPage's
+          // own link to /admin/apk) — same components, same design as
+          // the rest of the app, just without the chat shell around them.
           <IonReactRouter>
             <div className="app-shell">
               <div className="app-shell__main">

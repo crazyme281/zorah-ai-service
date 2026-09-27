@@ -18,6 +18,15 @@ from access.db import select, insert, delete, service_headers
 from config import SUPABASE_URL
 
 REQUEST_TIMEOUT = 30
+# The metadata calls above (select/insert/delete against PostgREST) are
+# small and fast — 30s is generous for those. Actually transferring the
+# APK's bytes to/from Supabase Storage is a different kind of request:
+# a real release build is tens of MB, and on a free-tier backend with a
+# cold start plus the extra hop of proxying the file to Supabase, 30s is
+# nowhere near enough. That mismatch — the upload silently timing out
+# before Storage ever finished writing it — is the actual reason
+# uploads were failing, not anything about how the metadata was stored.
+STORAGE_TIMEOUT = 180
 APK_BUCKET = "apk-releases"
 EXPECTED_PACKAGE = "ai.zorah.app"
 
@@ -46,6 +55,14 @@ class ApkAlreadyExists(ApkError):
 
 class NoCurrentApk(ApkError):
     pass
+
+
+class StorageUploadFailed(ApkError):
+    """The Storage transfer itself didn't complete — timed out, dropped,
+    or Supabase rejected it. Raised instead of letting the underlying
+    requests exception surface as an opaque 500, so the admin sees an
+    actual reason and — critically — so upload_release below never
+    reaches the DB insert for a file that isn't really in Storage."""
 
 
 def _now() -> datetime:
@@ -102,20 +119,41 @@ def get_current() -> dict | None:
 def upload_release(data: bytes, original_filename: str, uploaded_by: str) -> dict:
     """The workflow the spec requires — delete-before-upload — is
     enforced here, not just in the UI: a second upload while one is
-    already current is rejected outright."""
+    already current is rejected outright.
+
+    The insert() call at the end is only ever reached if the storage
+    POST above it actually returned success — there's no path from a
+    failed/partial Storage write to a DB row that claims otherwise."""
     if get_current() is not None:
         raise ApkAlreadyExists("delete the current APK before uploading a new one")
 
     meta = parse_apk(data)
     storage_path = f"releases/{meta['version_code']}-{original_filename}"
 
-    resp = requests.post(
-        f"{SUPABASE_URL}/storage/v1/object/{APK_BUCKET}/{storage_path}",
-        headers=service_headers({"Content-Type": "application/vnd.android.package-archive"}),
-        data=data,
-        timeout=REQUEST_TIMEOUT,
-    )
-    resp.raise_for_status()
+    try:
+        resp = requests.post(
+            f"{SUPABASE_URL}/storage/v1/object/{APK_BUCKET}/{storage_path}",
+            headers=service_headers({"Content-Type": "application/vnd.android.package-archive"}),
+            data=data,
+            timeout=STORAGE_TIMEOUT,
+        )
+    except requests.exceptions.Timeout:
+        raise StorageUploadFailed(
+            f"upload to storage timed out after {STORAGE_TIMEOUT}s — the file may be too "
+            "large for the current connection, try again"
+        )
+    except requests.exceptions.RequestException as e:
+        raise StorageUploadFailed(f"couldn't reach storage: {e}")
+
+    if not resp.ok:
+        # Surface whatever Supabase actually said (bucket/permission/size
+        # errors all come back as a JSON body here) instead of a bare
+        # status code — this is the "show the actual error" case.
+        try:
+            reason = resp.json().get("message", resp.text)
+        except ValueError:
+            reason = resp.text or f"HTTP {resp.status_code}"
+        raise StorageUploadFailed(f"storage upload failed: {reason}")
 
     return insert(
         "apk_releases",

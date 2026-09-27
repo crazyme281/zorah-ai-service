@@ -1906,6 +1906,31 @@ ion-item:hover .chat-delete-icon {
   color: #e79b8f;
 }
 
+.admin-apk__success {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: var(--zr-radius-sm);
+  background: rgba(61, 220, 127, 0.1);
+  color: #3ddc7f;
+  font-size: 0.85rem;
+}
+
+.admin-apk__success--muted {
+  background: var(--zr-panel);
+  color: var(--zr-text-dim);
+  border: 1px solid var(--zr-line);
+}
+
+.admin-apk__progress {
+  margin-top: 14px;
+  width: 100%;
+  border-radius: 3px;
+  --progress-background: var(--zr-gold);
+}
+
 /* ---------------------------------------------------------------- Code Fixer -- */
 
 .codefix {

@@ -503,11 +503,11 @@ def devices_self(device_installation_id: str, user_id: str = Depends(require_use
 # APK releases — "Get App" download, admin management, and auto-update.
 #
 # The Android app and the website are the same Capacitor build (see the
-# other repo, zorah-mobile) — "admin exists only on the web" is enforced
-# here in two independent ways: the frontend never routes to the admin
-# page when Capacitor.isNativePlatform() is true, AND every admin endpoint
-# below requires role == 'admin' looked up fresh from profiles on every
-# call, so hiding the UI is a courtesy, not the actual security boundary.
+# other repo, zorah-mobile) — an admin account opens straight to the
+# Admin Dashboard on both, no separate "admin exists only on the web"
+# gate in the frontend. The actual security boundary is here,
+# server-side: every admin endpoint below requires role == 'admin'
+# looked up fresh from profiles on every call.
 # =============================================================================
 
 def require_admin(user_id: str = Depends(require_user)) -> str:
@@ -563,6 +563,8 @@ async def admin_apk_upload(file: UploadFile = File(...), user_id: str = Depends(
         raise HTTPException(status_code=409, detail=str(e))
     except apk_releases.InvalidApkFile as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except apk_releases.StorageUploadFailed as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 
 @app.delete("/admin/apk")

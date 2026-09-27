@@ -16,11 +16,10 @@ import { usePlan } from "../hooks/usePlan";
 import { useAuth } from "../hooks/useAuth";
 
 /**
- * `admin` renders the header for the admin-only shell: no hamburger
- * (there's no chat drawer to open there), no upgrade pill (admins
- * aren't on a paid-tier ladder), and the avatar button signs out
- * directly instead of linking to /settings, which doesn't exist for
- * admins — see App.tsx's admin branch for the routes this pairs with.
+ * `admin` renders the header for the admin-only shell (see App.tsx): no
+ * hamburger — there's no chat drawer mounted there to open — no upgrade
+ * pill, and the avatar button signs out directly since there's no
+ * Settings page for admins to land on.
  */
 export function TopBar({ online = true, admin = false }: { online?: boolean; admin?: boolean }) {
   const router = useIonRouter();
