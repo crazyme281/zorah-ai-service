@@ -21,9 +21,22 @@ async function authHeader(): Promise<Record<string, string>> {
 }
 
 export async function getPlan(): Promise<PlanStatus | null> {
-  const resp = await fetch(`${BASE}/account/plan`, { headers: await authHeader() });
-  if (!resp.ok) return null;
-  return resp.json();
+  // Must never throw or hang: App.tsx waits on this before rendering
+  // anything, so a network error or a sleeping backend would otherwise
+  // leave the screen blank.
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const resp = await fetch(`${BASE}/account/plan`, {
+      headers: await authHeader(),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch {
+    return null;
+  }
 }
 
 /** Step 1 — reserves a tx_ref for this account before Flutterwave's

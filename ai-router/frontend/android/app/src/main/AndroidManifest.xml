@@ -22,6 +22,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Google / magic-link sign-in returns here (ai.zorah.app://auth/callback)
+                 so the user is signed in inside the app instead of on the website.
+                 Must match NATIVE_REDIRECT in src/lib/nativeAuth.ts and be allowed
+                 in Supabase → Authentication → URL Configuration → Redirect URLs. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="ai.zorah.app" android:host="auth" android:pathPrefix="/callback" />
+            </intent-filter>
+
         </activity>
 
         <provider

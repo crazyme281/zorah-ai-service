@@ -3,6 +3,7 @@ import type { User } from "@supabase/supabase-js";
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "../lib/supabase";
 import { getDeviceInstallationId, currentPlatform } from "../lib/deviceId";
+import { NATIVE_REDIRECT, startNativeGoogleSignIn } from "../lib/nativeAuth";
 
 const REMEMBER_KEY = "zorah:remember";
 const BASE = import.meta.env.VITE_AI_BACKEND_URL;
@@ -21,10 +22,13 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        setUser(data.session?.user ?? null);
+      })
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
@@ -92,7 +96,13 @@ export function useAuth() {
 
   /** Magic link — also backs the "Forgot password?" action on the login page. */
   async function signInWithEmail(email: string) {
-    const { error } = await supabase.auth.signInWithOtp({ email });
+    // In the app the link must open the app, not the website — with the
+    // native client on PKCE, a link that lands on the website has no way
+    // to redeem its code.
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: Capacitor.isNativePlatform() ? { emailRedirectTo: NATIVE_REDIRECT } : undefined,
+    });
     if (error) throw error;
   }
 
@@ -104,6 +114,11 @@ export function useAuth() {
    * login keeps calling this with no argument, unchanged.
    */
   async function signInWithGoogle(forceAccountSelection = false) {
+    // In the app: Custom Tab + deep link back, never the website.
+    if (Capacitor.isNativePlatform()) {
+      await startNativeGoogleSignIn(forceAccountSelection);
+      return;
+    }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -138,28 +153,64 @@ export function useAuth() {
    * as if the user had just logged in normally — onAuthStateChange fires
    * and `user` above updates on its own.
    */
-  async function linkWithCode(code: string) {
+  async function linkWithCode(rawCode: string) {
     if (!BASE) throw new Error("AI backend isn't configured.");
+    // Codes are typed or pasted by hand: drop spaces/dashes and fix case
+    // so "abcd-efgh " still works.
+    const code = rawCode.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (code.length !== 8) throw new Error("Enter the 8-character code from the website.");
+
     const deviceId = await getDeviceInstallationId();
-    const resp = await fetch(`${BASE}/devices/link/consume`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        code: code.trim(),
-        device_installation_id: deviceId,
-        platform: currentPlatform(),
-      }),
-    });
+
+    // The backend is on a free Render plan and can take ~50s to wake up,
+    // so give it a long timeout and say so, instead of a bare
+    // "Failed to fetch" that looks like the code was wrong.
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 70000);
+    let resp: Response;
+    try {
+      resp = await fetch(`${BASE}/devices/link/consume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          device_installation_id: deviceId,
+          platform: currentPlatform(),
+        }),
+        signal: ctrl.signal,
+      });
+    } catch (e) {
+      throw new Error(
+        e instanceof DOMException && e.name === "AbortError"
+          ? "The server took too long to respond. It may be waking up — generate a new code and try again."
+          : "Couldn't reach the server. Check your connection and try again.",
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+
     if (!resp.ok) {
       const body = await resp.json().catch(() => null);
-      throw new Error(body?.detail || "That code didn't work.");
+      const detail = typeof body?.detail === "string" ? body.detail : null;
+      throw new Error(
+        detail ??
+          (resp.status >= 500
+            ? "The server hit an error. Generate a new code and try again."
+            : "That code didn't work."),
+      );
     }
+
     const session = await resp.json();
     const { error } = await supabase.auth.setSession({
       access_token: session.access_token,
       refresh_token: session.refresh_token,
     });
-    if (error) throw error;
+    if (error) {
+      // Tokens were issued but this app's Supabase client rejected them —
+      // almost always means the app and the backend are pointed at
+      // different Supabase projects.
+      throw new Error(`Linked, but sign-in failed: ${error.message}`);
+    }
   }
 
   async function listDevices(): Promise<LinkedDevice[]> {

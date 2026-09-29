@@ -13,9 +13,13 @@ export function usePlan() {
       setLoading(false);
       return;
     }
-    const status = await getPlan();
-    setPlan(status);
-    setLoading(false);
+    try {
+      setPlan(await getPlan());
+    } catch {
+      setPlan(null);
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
 
   useEffect(() => {

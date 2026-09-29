@@ -11,6 +11,7 @@ import {
   keyOutline,
 } from "ionicons/icons";
 import { ZorahLogo } from "../components/ZorahLogo";
+import { useAuthCallbackError } from "../lib/nativeAuth";
 
 interface LoginPageProps {
   onSubmitPassword: (email: string, password: string, remember: boolean) => Promise<void>;
@@ -62,6 +63,11 @@ export function LoginPage({
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Errors from the Google / magic-link deep link coming back into the app.
+  useAuthCallbackError((message) => {
+    setError(message);
+    setBusy(false);
+  });
   const [notice, setNotice] = useState<string | null>(null);
   const [showCodeEntry, setShowCodeEntry] = useState(false);
   const [linkCode, setLinkCode] = useState("");
@@ -104,6 +110,10 @@ export function LoginPage({
     setError(null);
     try {
       await onGoogle();
+      // In the app the Custom Tab is now open over this screen; don't leave
+      // the buttons disabled if the user backs out of it. (On the website
+      // the page navigates away, so this never matters.)
+      if (Capacitor.isNativePlatform()) setBusy(false);
     } catch {
       setError("Google sign-in isn't available right now.");
       setBusy(false);
@@ -112,11 +122,11 @@ export function LoginPage({
 
   async function handleLinkCode() {
     if (!onLinkWithCode || busy) return;
-    if (linkCode.trim().length < 6) return setError("Enter the 8-character code from the website.");
+    if (linkCode.length !== 8) return setError("Enter the 8-character code from the website.");
     setBusy(true);
     setError(null);
     try {
-      await onLinkWithCode(linkCode.trim());
+      await onLinkWithCode(linkCode);
     } catch (e) {
       setError(e instanceof Error ? e.message : "That code didn't work.");
     } finally {
@@ -215,8 +225,16 @@ export function LoginPage({
                   <IonInput
                     placeholder="8-character code"
                     value={linkCode}
-                    maxlength={8}
-                    onIonInput={(e) => setLinkCode((e.detail.value ?? "").toUpperCase())}
+                    autocapitalize="characters"
+                    autocomplete="off"
+                    onIonInput={(e) =>
+                      setLinkCode(
+                        String(e.detail.value ?? "")
+                          .toUpperCase()
+                          .replace(/[^A-Z0-9]/g, "")
+                          .slice(0, 8),
+                      )
+                    }
                     onKeyDown={(e) => e.key === "Enter" && handleLinkCode()}
                     aria-label="Device link code"
                   />

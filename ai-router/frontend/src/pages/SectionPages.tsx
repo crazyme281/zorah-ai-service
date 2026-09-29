@@ -152,7 +152,7 @@ function DeviceLinkPanel() {
               </button>
             </div>
             <p className="devicelink-hint">
-              Open the Zorah AI app, tap &ldquo;Have a code?&rdquo; on the login screen, and enter
+              Open the Zorah AI app, tap &ldquo;Have a code from the website?&rdquo; on the login screen, and enter
               this within {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}.
             </p>
           </>

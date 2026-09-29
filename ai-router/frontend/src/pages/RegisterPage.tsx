@@ -7,7 +7,9 @@ import {
   eyeOffOutline,
   arrowForwardOutline,
 } from "ionicons/icons";
+import { Capacitor } from "@capacitor/core";
 import { ZorahLogo } from "../components/ZorahLogo";
+import { useAuthCallbackError } from "../lib/nativeAuth";
 
 interface RegisterPageProps {
   onRegister: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>;
@@ -48,6 +50,10 @@ export function RegisterPage({ onRegister, onGoogle, onBackToLogin }: RegisterPa
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useAuthCallbackError((message) => {
+    setError(message);
+    setBusy(false);
+  });
   // Set only when Supabase requires email confirmation before a session
   // exists — until then this screen stays up rather than bouncing the
   // user back to login on its own.
@@ -82,6 +88,10 @@ export function RegisterPage({ onRegister, onGoogle, onBackToLogin }: RegisterPa
     setError(null);
     try {
       await onGoogle();
+      // In the app the Custom Tab is now open over this screen; don't leave
+      // the buttons disabled if the user backs out of it. (On the website
+      // the page navigates away, so this never matters.)
+      if (Capacitor.isNativePlatform()) setBusy(false);
     } catch {
       setError("Google sign-in isn't available right now.");
       setBusy(false);

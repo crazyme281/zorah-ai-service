@@ -18,11 +18,16 @@ import "./theme/variables.css";
 import "./App.css";
 
 import App from "./App";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { initNativeAuth } from "./lib/nativeAuth";
 
 setupIonicReact({ mode: "md" });
+initNativeAuth();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>,
 );
