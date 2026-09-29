@@ -245,6 +245,8 @@ def _describe_upstream_error(e: Exception) -> str:
     resp = getattr(e, "response", None)
     if resp is not None:
         return f"auth service returned HTTP {resp.status_code}"
+    if isinstance(e, KeyError):
+        return f"unexpected auth response, missing {e}"
     return f"{type(e).__name__}"
 
 
@@ -268,16 +270,34 @@ def _mint_session_for_user(user_id: str) -> dict:
         timeout=REQUEST_TIMEOUT,
     )
     gen.raise_for_status()
-    token_hash = gen.json()["properties"]["hashed_token"]
+    gen_body = gen.json()
+    # The raw Admin API returns hashed_token at the TOP LEVEL; only
+    # supabase-js repackages it under "properties". Accept both shapes.
+    token_hash = gen_body.get("hashed_token") or (gen_body.get("properties") or {}).get("hashed_token")
+    if not token_hash:
+        raise DeviceLinkError(
+            f"auth service didn't return a login token (response fields: {sorted(gen_body.keys())[:12]})"
+        )
 
-    verify = requests.post(
-        f"{SUPABASE_URL}/auth/v1/verify",
-        headers={"apikey": SUPABASE_SERVICE_ROLE_KEY, "Content-Type": "application/json"},
-        json={"type": "magiclink", "token_hash": token_hash},
-        timeout=REQUEST_TIMEOUT,
-    )
-    verify.raise_for_status()
-    data = verify.json()
+    # "magiclink" is the older name for this token type; newer Supabase
+    # versions prefer "email". Try one, fall back to the other.
+    data = None
+    last = None
+    for token_type in ("magiclink", "email"):
+        verify = requests.post(
+            f"{SUPABASE_URL}/auth/v1/verify",
+            headers={"apikey": SUPABASE_SERVICE_ROLE_KEY, "Content-Type": "application/json"},
+            json={"type": token_type, "token_hash": token_hash},
+            timeout=REQUEST_TIMEOUT,
+        )
+        if verify.ok and "access_token" in verify.json():
+            data = verify.json()
+            break
+        last = verify
+    if data is None:
+        raise DeviceLinkError(
+            f"auth service refused the login token (HTTP {last.status_code if last is not None else '?'})"
+        )
 
     return {
         "access_token": data["access_token"],
