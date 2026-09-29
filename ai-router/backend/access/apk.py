@@ -55,6 +55,12 @@ class NoCurrentApk(ApkError):
     pass
 
 
+class DeleteFailed(ApkError):
+    """The current release couldn't be fully deleted — either Supabase
+    Storage or the apk_releases row refused. Carries the upstream reason
+    so the admin sees what actually went wrong instead of a bare 500."""
+
+
 class StorageUploadFailed(ApkError):
     """Distinct from InvalidApkFile — this means the file itself was
     fine, but the network call to Supabase Storage didn't succeed
@@ -188,18 +194,42 @@ def delete_current() -> None:
     if current is None:
         raise NoCurrentApk("no current APK to delete")
 
-    resp = requests.delete(
-        f"{SUPABASE_URL}/storage/v1/object/{APK_BUCKET}/{current['storage_path']}",
-        headers=service_headers(),
-        timeout=REQUEST_TIMEOUT,
-    )
-    # A 404 here just means the storage object was already gone somehow —
-    # the DB row is still the thing that determines "is there a current
-    # APK," so that's what actually has to succeed.
-    if resp.status_code not in (200, 404):
-        resp.raise_for_status()
+    # Bulk-delete endpoint (DELETE /object/{bucket} with a prefixes list)
+    # rather than the single-object URL: it returns 200 with an empty
+    # list when the object is already gone, whereas Storage reports a
+    # missing object on the single-object route as HTTP 400 (with
+    # statusCode "404" in the body), which the old status check treated
+    # as a hard failure and surfaced as a 500.
+    try:
+        resp = requests.delete(
+            f"{SUPABASE_URL}/storage/v1/object/{APK_BUCKET}",
+            headers=service_headers(),
+            json={"prefixes": [current["storage_path"]]},
+            timeout=REQUEST_TIMEOUT,
+        )
+    except requests.exceptions.RequestException as e:
+        raise DeleteFailed(f"couldn't reach Supabase Storage to delete the file: {e}")
 
-    delete("apk_releases", {"id": f"eq.{current['id']}"})
+    if resp.status_code >= 400 and not _storage_says_not_found(resp):
+        raise DeleteFailed(
+            f"Supabase Storage rejected the delete (HTTP {resp.status_code}): {resp.text[:300]}"
+        )
+
+    # The DB row is what determines "is there a current APK", so this is
+    # the step that has to succeed for the delete to count.
+    try:
+        delete("apk_releases", {"id": f"eq.{current['id']}"})
+    except requests.exceptions.RequestException as e:
+        upstream = getattr(e, "response", None)
+        reason = upstream.text[:300] if upstream is not None else str(e)
+        raise DeleteFailed(f"file removed from Storage, but deleting the database row failed: {reason}")
+
+
+def _storage_says_not_found(resp: "requests.Response") -> bool:
+    if resp.status_code == 404:
+        return True
+    text = resp.text.lower()
+    return '"statuscode":"404"' in text.replace(" ", "") or "not_found" in text or "not found" in text
 
 
 def signed_download_url(expires_in: int = 300) -> dict:

@@ -139,7 +139,10 @@ export function AdminApkPage() {
         method: "DELETE",
         headers: await authHeader(),
       });
-      if (!resp.ok) throw new Error("Delete failed.");
+      if (!resp.ok) {
+        const body = await resp.json().catch(() => null);
+        throw new Error(body?.detail || "Delete failed.");
+      }
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Delete failed.");

@@ -13,9 +13,9 @@ import os
 from typing import Any
 
 import requests
-from fastapi import BackgroundTasks, Depends, FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from router import AIRouter
@@ -55,6 +55,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Unhandled errors are raised outside CORSMiddleware, so the default
+    500 response carries no Access-Control-Allow-Origin header — the
+    browser then reports a misleading "blocked by CORS policy" instead
+    of the real error. Return the 500 ourselves, with the header."""
+    logging.exception("Unhandled error on %s %s", request.method, request.url.path)
+    origin = request.headers.get("origin")
+    headers = {}
+    if "*" in allowed_origins:
+        headers["Access-Control-Allow-Origin"] = "*"
+    elif origin and origin in allowed_origins:
+        headers["Access-Control-Allow-Origin"] = origin
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Server error: {type(exc).__name__}: {str(exc)[:200]}"},
+        headers=headers,
+    )
 
 
 def require_user(authorization: str | None = Header(default=None)) -> str:
@@ -577,6 +597,9 @@ def admin_apk_delete(user_id: str = Depends(require_admin)):
         apk_releases.delete_current()
     except apk_releases.NoCurrentApk as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except apk_releases.DeleteFailed as e:
+        # 502 = the upstream (Supabase) call failed, not this request.
+        raise HTTPException(status_code=502, detail=str(e))
     return {"ok": True}
 
 
