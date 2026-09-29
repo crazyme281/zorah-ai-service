@@ -51,6 +51,8 @@ export function AdminApkPage() {
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [uploadingName, setUploadingName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function refresh() {
@@ -79,6 +81,7 @@ export function AdminApkPage() {
       return;
     }
     setUploading(true);
+    setUploadingName(file.name);
     setError(null);
     try {
       const form = new FormData();
@@ -111,6 +114,7 @@ export function AdminApkPage() {
       setError(e instanceof Error ? e.message : "Upload failed.");
     } finally {
       setUploading(false);
+      setUploadingName(null);
     }
   }
 
@@ -208,15 +212,37 @@ export function AdminApkPage() {
                 </div>
               ) : (
                 <div className="settings-card">
-                  <div className="admin-apk__upload">
+                  {/* preventDefault on BOTH dragover and drop is what stops
+                      the browser from just opening/downloading the dropped
+                      file itself — without it, dropping never reaches
+                      handleUpload at all. */}
+                  <div
+                    className={`admin-apk__upload ${dragOver ? "admin-apk__upload--active" : ""}`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (!uploading) setDragOver(true);
+                    }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOver(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file && !uploading) handleUpload(file);
+                    }}
+                  >
                     <IonIcon icon={cloudUploadOutline} />
-                    <p>No current APK. Upload one to make it available to users.</p>
+                    <p>
+                      {uploading
+                        ? `Uploading ${uploadingName ?? "APK"}… this can take a minute for large files.`
+                        : "No current APK. Drag an .apk file here, or choose one to upload."}
+                    </p>
                     <button
                       type="button"
+                      className="admin-apk__upload-btn"
                       onClick={() => fileRef.current?.click()}
                       disabled={uploading}
                     >
-                      {uploading ? <IonSpinner name="crescent" /> : "Upload APK"}
+                      {uploading ? <IonSpinner name="crescent" /> : "Choose APK"}
                     </button>
                   </div>
                 </div>

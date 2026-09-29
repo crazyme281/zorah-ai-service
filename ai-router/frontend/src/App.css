@@ -1872,6 +1872,44 @@ ion-item:hover .chat-delete-icon {
 .admin-apk__upload {
   padding: 30px 20px;
   text-align: center;
+  /* A visible drop zone — this used to be an unstyled box, which (with
+     the button below also unstyled) gave an admin no signal that
+     anything here was interactive. */
+  border: 1.5px dashed var(--zr-line-gold);
+  border-radius: var(--zr-radius);
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.admin-apk__upload--active {
+  border-color: rgba(214, 156, 46, 0.8);
+  background: var(--zr-gold-wash);
+}
+
+/* The actual fix for "Upload APK looks like plain text": a real primary
+   button, same treatment as the other gold actions in the app. */
+.admin-apk__upload-btn {
+  min-width: 160px;
+  padding: 12px 22px;
+  border: 0;
+  border-radius: var(--zr-radius);
+  background: var(--zr-gold-gradient);
+  color: var(--zr-gold-ink);
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.admin-apk__upload-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.admin-apk__upload-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .admin-apk__upload ion-icon {
@@ -1904,31 +1942,6 @@ ion-item:hover .chat-delete-icon {
   margin: 10px 14px 14px;
   font-size: 0.83rem;
   color: #e79b8f;
-}
-
-.admin-apk__success {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 12px;
-  padding: 10px 14px;
-  border-radius: var(--zr-radius-sm);
-  background: rgba(61, 220, 127, 0.1);
-  color: #3ddc7f;
-  font-size: 0.85rem;
-}
-
-.admin-apk__success--muted {
-  background: var(--zr-panel);
-  color: var(--zr-text-dim);
-  border: 1px solid var(--zr-line);
-}
-
-.admin-apk__progress {
-  margin-top: 14px;
-  width: 100%;
-  border-radius: 3px;
-  --progress-background: var(--zr-gold);
 }
 
 /* ---------------------------------------------------------------- Code Fixer -- */
