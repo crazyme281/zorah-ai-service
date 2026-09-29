@@ -483,7 +483,7 @@ def devices_link_consume(req: LinkConsumeRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except device_links.DeviceLinkError as e:
         logging.error("device link session mint failed: %s", e)
-        raise HTTPException(status_code=502, detail="couldn't complete sign-in")
+        raise HTTPException(status_code=502, detail=f"couldn't complete sign-in ({e})")
     return session
 
 

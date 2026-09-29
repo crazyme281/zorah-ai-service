@@ -134,8 +134,24 @@ def consume_link(code: str, device_installation_id: str, platform: str, push_tok
         raise InvalidOrExpiredCode("code was just used by another request")
 
     user_id = token["user_id"]
-    register_device(user_id, device_installation_id, platform, push_token)
-    session = _mint_session_for_user(user_id)
+    try:
+        register_device(user_id, device_installation_id, platform, push_token)
+        session = _mint_session_for_user(user_id)
+    except Exception as e:
+        # Minting failed AFTER the code was consumed — hand the code back
+        # so the user can retry within its 2 minutes instead of being told
+        # a perfectly good code is "already used".
+        try:
+            patch(
+                "device_link_tokens",
+                {"id": f"eq.{token['id']}", "status": "eq.consumed"},
+                {"status": "pending", "consumed_at": None, "consumed_by_device": None},
+            )
+        except Exception:
+            pass
+        if isinstance(e, DeviceLinkError):
+            raise
+        raise DeviceLinkError(_describe_upstream_error(e)) from e
     return session
 
 
@@ -221,6 +237,16 @@ def _patch_token(token_id: str, fields: dict, guard_status: str | None = None) -
 
 
 # --------------------------------------------------- Supabase admin auth --
+
+def _describe_upstream_error(e: Exception) -> str:
+    """Short, safe-to-show reason for a failed Supabase call (status code
+    only — no response bodies, since this reaches an unauthenticated
+    caller)."""
+    resp = getattr(e, "response", None)
+    if resp is not None:
+        return f"auth service returned HTTP {resp.status_code}"
+    return f"{type(e).__name__}"
+
 
 def _mint_session_for_user(user_id: str) -> dict:
     """
