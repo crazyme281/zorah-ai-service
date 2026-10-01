@@ -117,6 +117,54 @@ export type Database = {
         }
         Relationships: []
       }
+      training_courses: {
+        Row: {
+          created_at: string
+          curriculum: Json
+          current_lesson_id: string | null
+          id: string
+          is_coding: boolean
+          language: string | null
+          level: string | null
+          progress: Json
+          stage: string
+          subject: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          curriculum: Json
+          current_lesson_id?: string | null
+          id?: string
+          is_coding?: boolean
+          language?: string | null
+          level?: string | null
+          progress?: Json
+          stage?: string
+          subject: string
+          title: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          curriculum?: Json
+          current_lesson_id?: string | null
+          id?: string
+          is_coding?: boolean
+          language?: string | null
+          level?: string | null
+          progress?: Json
+          stage?: string
+          subject?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

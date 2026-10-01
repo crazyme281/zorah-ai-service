@@ -15,6 +15,8 @@ import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { ImagesPage, HistoryPage, SettingsPage } from "./pages/SectionPages";
 import { CodeFixerPage } from "./pages/CodeFixerPage";
+import { TrainingPage } from "./pages/TrainingPage";
+import { TrainingCoursePage } from "./pages/TrainingCoursePage";
 import { UpgradePage } from "./pages/UpgradePage";
 import { AdminApkPage } from "./pages/AdminApkPage";
 import { AdminDashboardPage } from "./pages/AdminDashboardPage";
@@ -153,6 +155,8 @@ export default function App() {
                   <Route exact path="/chat/:conversationId" component={ChatPage} />
                   <Route exact path="/images" component={ImagesPage} />
                   <Route exact path="/code" component={CodeFixerPage} />
+                  <Route exact path="/training" component={TrainingPage} />
+                  <Route exact path="/training/:courseId" component={TrainingCoursePage} />
                   <Route exact path="/history" component={HistoryPage} />
                   <Route exact path="/settings" component={SettingsPage} />
                   <Route exact path="/upgrade" component={UpgradePage} />

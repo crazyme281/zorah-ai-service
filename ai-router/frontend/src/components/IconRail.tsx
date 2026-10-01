@@ -11,12 +11,14 @@ import {
   timeOutline,
   settingsOutline,
   codeSlashOutline,
+  schoolOutline,
 } from "ionicons/icons";
 
 export const RAIL_ITEMS = [
   { label: "Chat", icon: chatbubbleEllipsesOutline, path: "/" },
   { label: "Images", icon: imagesOutline, path: "/images" },
   { label: "Code", icon: codeSlashOutline, path: "/code" },
+  { label: "Training", icon: schoolOutline, path: "/training" },
   { label: "History", icon: timeOutline, path: "/history" },
   { label: "Settings", icon: settingsOutline, path: "/settings" },
 ] as const;

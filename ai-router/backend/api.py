@@ -16,7 +16,7 @@ import requests
 from fastapi import BackgroundTasks, Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from router import AIRouter
 from emotion.engine import EmotionEngine
@@ -28,6 +28,7 @@ from access import apk as apk_releases
 from access.db import select
 from access import codefix_db
 from access import codefix_pipeline
+from training import engine as training_engine
 from config import MAX_UPLOAD_ZIP_BYTES
 from branding import scrub_result_for_user
 from config import API_KEYS, FLUTTERWAVE_SECRET_KEY, REQUEST_TIMEOUT, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
@@ -717,3 +718,126 @@ def download_code_fixer_result(job_id: str, user_id: str = Depends(require_user)
         raise HTTPException(status_code=409, detail="this job doesn't have a result ready yet")
     url = codefix_pipeline.signed_url(codefix_pipeline.RESULT_BUCKET, job["result_path"])
     return {"url": url, "expires_in": 300}
+
+
+# ---------------------------------------------------------------------------
+# Training (Go and Pro) — AI-generated learning paths. Progress itself is
+# saved by the app straight to Supabase (training_courses, RLS-protected);
+# these endpoints only generate content, so every one re-checks the plan
+# server-side rather than trusting the app's own gating.
+# ---------------------------------------------------------------------------
+class TrainingLesson(BaseModel):
+    id: str = Field(default="", max_length=20)
+    title: str = Field(max_length=200)
+    summary: str = Field(default="", max_length=400)
+
+
+class TrainingCourseCtx(BaseModel):
+    subject: str = Field(min_length=1, max_length=200)
+    is_coding: bool = False
+    language: str | None = Field(default=None, max_length=40)
+    level: str | None = Field(default=None, max_length=40)
+    stage: str = Field(default="basic", max_length=20)
+    course_title: str = Field(default="", max_length=200)
+
+
+class TrainingCurriculumRequest(TrainingCourseCtx):
+    focus: str | None = Field(default=None, max_length=400)
+
+
+class TrainingLessonRequest(TrainingCourseCtx):
+    lesson: TrainingLesson
+    outline: list[str] = Field(default_factory=list, max_length=40)
+    mastery: dict = Field(default_factory=dict)
+
+
+class TrainingAnswerRequest(BaseModel):
+    subject: str = Field(max_length=200)
+    lesson_title: str = Field(max_length=200)
+    question: str = Field(max_length=800)
+    user_answer: str = Field(max_length=2000)
+    reference: str = Field(default="", max_length=1000)
+    options: list[str] | None = None
+    was_correct: bool | None = None
+
+
+class TrainingTaskRequest(TrainingCourseCtx):
+    lesson: TrainingLesson
+    performance: dict = Field(default_factory=dict)
+
+
+class TrainingReviewRequest(BaseModel):
+    subject: str = Field(max_length=200)
+    language: str | None = Field(default=None, max_length=40)
+    task: dict
+    submission: str = Field(max_length=14000)
+    mode: str = Field(default="review", pattern="^(review|tests)$")
+    run_result: dict | None = None
+    all_tests_passed: bool = False
+
+
+class TrainingQuizRequest(TrainingCourseCtx):
+    lesson: TrainingLesson
+    performance: dict = Field(default_factory=dict)
+
+
+def require_training(user_id: str = Depends(require_user)) -> str:
+    """Go and Pro only — subscriptions.entitlements_for() reads the tier
+    from the database and applies the expiry sweep, never a client claim."""
+    if not subscriptions.entitlements_for(user_id).can_use_teaching:
+        raise HTTPException(status_code=403, detail="Training is available on the Go and Pro plans.")
+    return user_id
+
+
+def _training_call(fn, **kwargs):
+    try:
+        return fn(router.providers, **kwargs)
+    except training_engine.TrainingGenerationError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+
+@app.get("/training/access")
+def training_access(user_id: str = Depends(require_user)):
+    ent = subscriptions.entitlements_for(user_id)
+    return {"allowed": ent.can_use_teaching}
+
+
+@app.post("/training/curriculum")
+def training_curriculum(req: TrainingCurriculumRequest, user_id: str = Depends(require_training)):
+    return _training_call(training_engine.generate_curriculum, subject=req.subject, is_coding=req.is_coding,
+                          language=req.language, level=req.level, stage=req.stage, focus=req.focus)
+
+
+@app.post("/training/lesson")
+def training_lesson(req: TrainingLessonRequest, user_id: str = Depends(require_training)):
+    return _training_call(training_engine.generate_lesson, subject=req.subject, is_coding=req.is_coding,
+                          language=req.language, level=req.level, stage=req.stage, course_title=req.course_title,
+                          lesson=req.lesson.model_dump(), outline=req.outline, mastery=req.mastery)
+
+
+@app.post("/training/answer")
+def training_answer(req: TrainingAnswerRequest, user_id: str = Depends(require_training)):
+    return _training_call(training_engine.respond_to_answer, subject=req.subject, lesson_title=req.lesson_title,
+                          question=req.question, user_answer=req.user_answer, reference=req.reference,
+                          was_correct=req.was_correct, options=req.options)
+
+
+@app.post("/training/task")
+def training_task(req: TrainingTaskRequest, user_id: str = Depends(require_training)):
+    return _training_call(training_engine.generate_task, subject=req.subject, is_coding=req.is_coding,
+                          language=req.language, level=req.level, stage=req.stage, course_title=req.course_title,
+                          lesson=req.lesson.model_dump(), performance=req.performance)
+
+
+@app.post("/training/task/review")
+def training_task_review(req: TrainingReviewRequest, user_id: str = Depends(require_training)):
+    return _training_call(training_engine.review_task, subject=req.subject, language=req.language, task=req.task,
+                          submission=req.submission, mode=req.mode, run_result=req.run_result,
+                          all_tests_passed=req.all_tests_passed)
+
+
+@app.post("/training/quiz")
+def training_quiz(req: TrainingQuizRequest, user_id: str = Depends(require_training)):
+    return _training_call(training_engine.generate_quiz, subject=req.subject, is_coding=req.is_coding,
+                          language=req.language, level=req.level, stage=req.stage, course_title=req.course_title,
+                          lesson=req.lesson.model_dump(), performance=req.performance)
