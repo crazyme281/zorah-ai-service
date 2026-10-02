@@ -59,6 +59,11 @@ export function useMessages(conversationId: string | null) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Mirrors `sending` for refresh() to check synchronously — refresh is a
+  // useCallback keyed only on conversationId, and adding `sending` to its
+  // own dependency array would just reintroduce the same race from a
+  // different angle (a new refresh firing every time sending flips).
+  const sendingRef = useRef(false);
 
   const refresh = useCallback(async () => {
     if (!conversationId) {
@@ -71,7 +76,15 @@ export function useMessages(conversationId: string | null) {
       .select("*")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true });
-    if (!dbError && data) setMessages(data.map(toChatMessage));
+    // A send can start right after this fetch begins and finish before
+    // it resolves — landing here afterward would wipe out the in-flight
+    // optimistic message and streaming reply with what was a genuinely
+    // empty, now-stale snapshot. This is exactly what caused the first
+    // message in a brand-new chat to vanish: refresh() finding zero rows
+    // for the just-created conversation and clobbering the send that was
+    // already under way. The send's own state updates are the source of
+    // truth while one is active, not this fetch.
+    if (!dbError && data && !sendingRef.current) setMessages(data.map(toChatMessage));
     setLoading(false);
   }, [conversationId]);
 
@@ -85,6 +98,7 @@ export function useMessages(conversationId: string | null) {
   const stopGenerating = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    sendingRef.current = false;
     setSending(false);
     setMessages((prev) =>
       prev.map((m) => (m.streaming ? { ...m, streaming: false, pending: false } : m)),
@@ -95,6 +109,7 @@ export function useMessages(conversationId: string | null) {
     if (!conversationId) return;
     if (!content.trim() && attachments.length === 0) return;
 
+    sendingRef.current = true;
     setSending(true);
     setError(null);
 
@@ -209,6 +224,7 @@ export function useMessages(conversationId: string | null) {
       );
     } finally {
       abortRef.current = null;
+      sendingRef.current = false;
       setSending(false);
     }
   }

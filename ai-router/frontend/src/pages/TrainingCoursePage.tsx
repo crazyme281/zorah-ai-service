@@ -59,7 +59,7 @@ export function TrainingCoursePage() {
     return (
       <IonPage><TopBar /><IonContent className="panel-page"><div className="tr-page">
         <ErrorBox text={error ?? "This course couldn't be found."} />
-        <button type="button" className="tr-btn" onClick={() => router.push("/training", "back")}>All courses</button>
+        <button type="button" className="tr-btn" onClick={() => router.push("/training", "none", "replace")}>All courses</button>
       </div></IonContent></IonPage>
     );
 
@@ -113,7 +113,7 @@ export function TrainingCoursePage() {
       <TopBar />
       <IonContent className="panel-page" ref={content}>
         <div className="tr-page">
-          <button type="button" className="tr-link" onClick={() => router.push("/training", "back")}>
+          <button type="button" className="tr-link" onClick={() => router.push("/training", "none", "replace")}>
             <IonIcon icon={chevronBack} /> All courses
           </button>
           <h1 className="tr-title">{course.title}</h1>

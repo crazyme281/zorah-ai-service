@@ -19,13 +19,17 @@ function Locked() {
   return (
     <div className="tr-locked">
       <IonIcon icon={lockClosedOutline} />
-      <h2>Training is a Go feature</h2>
+      <h2>Training is on the Go plan</h2>
       <p>
         Learn anything with a personal tutor: a custom curriculum, lessons that adapt to you, hands-on tasks, a built-in
         code console and quizzes that explain your mistakes.
       </p>
-      <button type="button" className="tr-btn tr-btn--gold" onClick={() => router.push("/upgrade", "forward")}>
-        See plans <IonIcon icon={arrowForward} />
+      {/* Same navigation style as the rail and the top-bar upgrade pill
+          (replace, no animation). A forward push would leave this page
+          buried under /upgrade, and Ionic then ignores the next tap on
+          the Training rail item because /training is "already open". */}
+      <button type="button" className="tr-btn tr-btn--gold" onClick={() => router.push("/upgrade", "none", "replace")}>
+        Upgrade to Go <IonIcon icon={arrowForward} />
       </button>
     </div>
   );
@@ -150,13 +154,17 @@ function Setup({ onCancel, onCreated }: { onCancel: () => void; onCreated: (c: C
 
 export function TrainingPage() {
   const router = useIonRouter();
-  const { plan } = usePlan();
+  const { plan, loading: planLoading, refresh: refreshPlan } = usePlan();
   const allowed = plan?.tier === "GO" || plan?.tier === "PRO";
   const [courses, setCourses] = useState<Course[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [setup, setSetup] = useState(false);
 
   useIonViewWillEnter(() => {
+    // Every visit re-checks the plan: paying (or a lapsed plan) takes effect
+    // straight away, and an unpaid visit shows "Upgrade to Go" again.
+    void refreshPlan();
+    setSetup(false);
     listCourses().then(setCourses).catch((e) => setError(e instanceof Error ? e.message : "Couldn't load your courses."));
   });
 
@@ -175,10 +183,17 @@ export function TrainingPage() {
       <TopBar />
       <IonContent className="panel-page">
         <div className="tr-page">
-          {!allowed ? (
+          {planLoading ? (
+            <div className="tr-loading tr-loading--big"><IonSpinner name="dots" /></div>
+          ) : !plan ? (
+            <div className="tr-error">
+              <p>Couldn't check your plan. Check your connection and try again.</p>
+              <button type="button" className="tr-btn" onClick={() => void refreshPlan()}>Try again</button>
+            </div>
+          ) : !allowed ? (
             <Locked />
           ) : setup ? (
-            <Setup onCancel={() => setSetup(false)} onCreated={(c) => { setSetup(false); router.push(`/training/${c.id}`, "forward"); }} />
+            <Setup onCancel={() => setSetup(false)} onCreated={(c) => { setSetup(false); router.push(`/training/${c.id}`, "none", "replace"); }} />
           ) : (
             <>
               <div className="tr-hero">
@@ -197,7 +212,7 @@ export function TrainingPage() {
                 const s = courseStats(c);
                 return (
                   <div key={c.id} className="tr-course">
-                    <button type="button" className="tr-course__main" onClick={() => router.push(`/training/${c.id}`, "forward")}>
+                    <button type="button" className="tr-course__main" onClick={() => router.push(`/training/${c.id}`, "none", "replace")}>
                       <strong>{c.title}</strong>
                       <span className="tr-muted">
                         {c.is_coding ? `${c.language} · ${STAGE_LABEL[c.stage]}` : c.subject} · {s.done}/{s.total} lessons
