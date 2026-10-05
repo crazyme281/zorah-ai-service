@@ -24,19 +24,26 @@ export async function getPlan(): Promise<PlanStatus | null> {
   // Must never throw or hang: App.tsx waits on this before rendering
   // anything, so a network error or a sleeping backend would otherwise
   // leave the screen blank.
-  try {
+  // The free-tier backend often needs 3-7s per call (and ~50s to wake), so
+  // a short timeout reported "plan unknown" for users with a perfectly good
+  // plan. Allow 20s, and retry once on a network error, timeout or 5xx.
+  for (let attempt = 0; attempt < 2; attempt++) {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 8000);
-    const resp = await fetch(`${BASE}/account/plan`, {
-      headers: await authHeader(),
-      signal: ctrl.signal,
-    });
-    clearTimeout(timer);
-    if (!resp.ok) return null;
-    return await resp.json();
-  } catch {
-    return null;
+    const timer = setTimeout(() => ctrl.abort(), 20000);
+    try {
+      const resp = await fetch(`${BASE}/account/plan`, {
+        headers: await authHeader(),
+        signal: ctrl.signal,
+      });
+      if (resp.ok) return await resp.json();
+      if (resp.status < 500) return null; // 401/403/404: retrying won't help
+    } catch {
+      /* network error or timeout — try once more */
+    } finally {
+      clearTimeout(timer);
+    }
   }
+  return null;
 }
 
 /** Step 1 — reserves a tx_ref for this account before Flutterwave's

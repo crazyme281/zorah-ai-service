@@ -24,6 +24,8 @@ import {
   copyOutline,
   checkmarkOutline,
   shareSocialOutline,
+  volumeHighOutline,
+  volumeMuteOutline,
 } from "ionicons/icons";
 import { useConversations } from "../hooks/useConversations";
 import { useMessages } from "../hooks/useMessages";
@@ -36,6 +38,23 @@ import { ZorahLogo } from "../components/ZorahLogo";
 /** Treat "within this many px of the bottom" as the user following along. */
 const STICK_THRESHOLD = 120;
 const PENDING_KEY = "zorah:pending-draft";
+
+/** Strips the markdown syntax out of a message before handing it to
+ * speech synthesis — reading "asterisk asterisk bold asterisk asterisk"
+ * out loud would sound broken rather than just reading the words. */
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, " code block ")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/[*_~]{1,3}([^*_~]+)[*_~]{1,3}/g, "$1")
+    .replace(/^>\s?/gm, "")
+    .replace(/^[-*+]\s+/gm, "")
+    .replace(/^\d+\.\s+/gm, "")
+    .trim();
+}
 
 export function ChatPage() {
   const { conversationId } = useParams<{ conversationId?: string }>();
@@ -50,6 +69,8 @@ export function ChatPage() {
   const [preparing, setPreparing] = useState(false);
   const [atBottom, setAtBottom] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+  const ttsSupported = typeof window !== "undefined" && "speechSynthesis" in window;
 
   const contentRef = useRef<HTMLIonContentElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -73,6 +94,14 @@ export function ChatPage() {
   useEffect(() => {
     if (stickRef.current) scrollToBottom(messages.length <= 1 ? 0 : 220);
   }, [messages, scrollToBottom]);
+
+  // Stop any in-progress read-aloud when switching chats or leaving the
+  // page — otherwise Zorah keeps talking over whatever's on screen next.
+  useEffect(() => {
+    return () => {
+      if (ttsSupported) window.speechSynthesis.cancel();
+    };
+  }, [conversationId, ttsSupported]);
 
   async function handleScroll() {
     const el = contentRef.current;
@@ -167,6 +196,27 @@ export function ChatPage() {
     } else {
       handleCopy("share-fallback", text);
     }
+  }
+
+  /** Tapping the message currently speaking stops it; tapping a
+   * different one cancels that and starts the new one — only ever one
+   * utterance in flight at a time, matching how Copy/Share only ever
+   * target the message you tapped. */
+  function handleSpeak(id: string, text: string) {
+    if (!ttsSupported) return;
+
+    if (speakingId === id) {
+      window.speechSynthesis.cancel();
+      setSpeakingId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(stripMarkdown(text));
+    utterance.onend = () => setSpeakingId((cur) => (cur === id ? null : cur));
+    utterance.onerror = () => setSpeakingId((cur) => (cur === id ? null : cur));
+    window.speechSynthesis.speak(utterance);
+    setSpeakingId(id);
   }
 
   const recording = voice.status === "recording";
@@ -274,6 +324,17 @@ export function ChatPage() {
                           <IonIcon icon={shareSocialOutline} />
                           Share
                         </button>
+                        {ttsSupported && (
+                          <button
+                            type="button"
+                            className="message-actions__btn"
+                            aria-label={speakingId === m.id ? "Stop reading aloud" : "Read aloud"}
+                            onClick={() => handleSpeak(m.id, m.content)}
+                          >
+                            <IonIcon icon={speakingId === m.id ? volumeMuteOutline : volumeHighOutline} />
+                            {speakingId === m.id ? "Stop" : "Listen"}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

@@ -80,7 +80,16 @@ export default function App() {
   // never flashes the full user shell for an admin account before
   // swapping to the admin-only one below — the role has to be known
   // before we pick which shell to render at all.
-  const ready = splashDone && !authLoading && (!user || !planLoading);
+  // ...but only up to a point: on a slow backend the app opens after a few
+  // seconds and the plan fills in when it arrives (the admin redirect
+  // below still fires then).
+  const [planWaitExpired, setPlanWaitExpired] = useState(false);
+  useEffect(() => {
+    if (!user) return;
+    const t = setTimeout(() => setPlanWaitExpired(true), 6000);
+    return () => clearTimeout(t);
+  }, [user?.id]);
+  const ready = splashDone && !authLoading && (!user || !planLoading || planWaitExpired);
 
   useEffect(() => {
     if (ready && user && isAdmin && !adminLanded) {

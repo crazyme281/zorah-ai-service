@@ -14,7 +14,7 @@ const START_STAGE: Record<string, Stage> = {
 };
 const OTHER_LEVELS = ["Complete beginner", "I know a little", "Fairly confident", "Advanced"];
 
-function Locked() {
+function Locked({ onRecheck, unsure }: { onRecheck?: () => void; unsure?: boolean }) {
   const router = useIonRouter();
   return (
     <div className="tr-locked">
@@ -31,6 +31,12 @@ function Locked() {
       <button type="button" className="tr-btn tr-btn--gold" onClick={() => router.push("/upgrade", "none", "replace")}>
         Upgrade to Go <IonIcon icon={arrowForward} />
       </button>
+      {unsure && onRecheck && (
+        <p className="tr-muted">
+          Already on Go?{" "}
+          <button type="button" className="tr-link" onClick={onRecheck}>Check again</button>
+        </p>
+      )}
     </div>
   );
 }
@@ -183,15 +189,15 @@ export function TrainingPage() {
       <TopBar />
       <IonContent className="panel-page">
         <div className="tr-page">
-          {planLoading ? (
-            <div className="tr-loading tr-loading--big"><IonSpinner name="dots" /></div>
-          ) : !plan ? (
-            <div className="tr-error">
-              <p>Couldn't check your plan. Check your connection and try again.</p>
-              <button type="button" className="tr-btn" onClick={() => void refreshPlan()}>Try again</button>
+          {planLoading && !plan ? (
+            <div className="tr-loading tr-loading--big">
+              <IonSpinner name="dots" />
+              <p>Checking your plan…</p>
             </div>
           ) : !allowed ? (
-            <Locked />
+            // Free plan — or a plan we couldn't confirm. Either way the page
+            // offers "Upgrade to Go" (the server still enforces the plan).
+            <Locked unsure={!plan} onRecheck={() => void refreshPlan()} />
           ) : setup ? (
             <Setup onCancel={() => setSetup(false)} onCreated={(c) => { setSetup(false); router.push(`/training/${c.id}`, "none", "replace"); }} />
           ) : (

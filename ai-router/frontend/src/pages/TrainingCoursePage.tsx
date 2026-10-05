@@ -38,6 +38,7 @@ export function TrainingCoursePage() {
   const lesson = course ? lessons.find((l) => l.id === course.current_lesson_id) ?? nextLesson(course) ?? lessons[0] : undefined;
   const state = lesson && course ? course.progress.lessons[lesson.id] : undefined;
   const allowed = plan?.tier === "GO" || plan?.tier === "PRO";
+  const planKnown = !!plan; // an unknown plan is not a lapsed plan
 
   // When the lesson changes, open it on the step the learner was up to.
   useEffect(() => {
@@ -68,7 +69,7 @@ export function TrainingCoursePage() {
   const cur = state ?? emptyLesson();
   const reached = ORDER.indexOf(cur.step);
   const done = isDone(course, lesson.id);
-  const locked = !allowed;
+  const locked = planKnown && !allowed;
 
   function selectLesson(id: string) {
     update((c) => ({ ...c, current_lesson_id: id }));
