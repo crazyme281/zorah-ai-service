@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ComponentPropsWithoutRef } from "react";
 import { useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -38,6 +39,51 @@ import { ZorahLogo } from "../components/ZorahLogo";
 /** Treat "within this many px of the bottom" as the user following along. */
 const STICK_THRESHOLD = 120;
 const PENDING_KEY = "zorah:pending-draft";
+
+/** react-markdown hands a <pre> override's children as a React element
+ * tree, not a plain string — this walks it back down to raw text
+ * regardless of whether it's a bare string, an array of text nodes, or
+ * one more level of element nesting, so the copy button works the same
+ * way no matter how a given code block happens to be structured. */
+function extractText(node: unknown): string {
+  if (typeof node === "string") return node;
+  if (Array.isArray(node)) return node.map(extractText).join("");
+  if (node && typeof node === "object" && "props" in node) {
+    return extractText((node as { props?: { children?: unknown } }).props?.children);
+  }
+  return "";
+}
+
+/** Per-code-block "Copy Code" — deliberately separate from the
+ * whole-message Copy button: this only ever copies the exact text of
+ * the one block it's attached to, never the explanation around it.
+ * Its own useState means each code block in a message tracks its own
+ * "Copied" state independently, with no shared id to manage. */
+function CodeBlock({ children, ...rest }: ComponentPropsWithoutRef<"pre">) {
+  const [copied, setCopied] = useState(false);
+  const codeText = extractText(children).replace(/\n$/, "");
+
+  async function handleCopyCode() {
+    try {
+      await navigator.clipboard.writeText(codeText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // Clipboard permission denied or unavailable — button just stays
+      // in its normal state, same as the whole-message copy's fallback.
+    }
+  }
+
+  return (
+    <div className="code-block">
+      <button type="button" className="code-block__copy" onClick={handleCopyCode}>
+        <IonIcon icon={copied ? checkmarkOutline : copyOutline} />
+        {copied ? "Copied" : "Copy Code"}
+      </button>
+      <pre {...rest}>{children}</pre>
+    </div>
+  );
+}
 
 /** Strips the markdown syntax out of a message before handing it to
  * speech synthesis — reading "asterisk asterisk bold asterisk asterisk"
@@ -289,7 +335,9 @@ export function ChatPage() {
 
                     {m.content && (
                       <div className="message-text markdown-body">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ pre: CodeBlock }}>
+                          {m.content}
+                        </ReactMarkdown>
                       </div>
                     )}
 
