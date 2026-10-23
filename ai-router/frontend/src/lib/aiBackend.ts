@@ -31,6 +31,8 @@ export interface OutboundMessage {
   content: ContentBlock[];
 }
 
+import { ASSISTANT_NAME } from "./modelIdentity";
+
 const BASE = import.meta.env.VITE_AI_BACKEND_URL;
 
 /** Requests otherwise hang forever; 90s is generous for a long answer. */
@@ -41,7 +43,7 @@ function placeholder(): { reply: string; model_label: string } {
     reply:
       "(AI backend not configured yet — this is a placeholder reply. " +
       "Set VITE_AI_BACKEND_URL once the router is exposed over HTTP.)",
-    model_label: "Zorah 1.0",
+    model_label: ASSISTANT_NAME,
   };
 }
 
@@ -91,7 +93,7 @@ export async function streamAIBackend(
     const decoder = new TextDecoder();
     let buffer = "";
     let reply = "";
-    let modelLabel = "Zorah 1.0";
+    let modelLabel: string = ASSISTANT_NAME;
 
     // SSE frames are separated by a blank line and can split across reads,
     // so buffer and only consume complete frames.

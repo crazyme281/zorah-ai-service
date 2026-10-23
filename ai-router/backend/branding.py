@@ -4,15 +4,17 @@ Users never see "Together AI", "Gemini", "Z.ai/GLM", "Groq", or
 provider mix underneath can change (swap models, add a provider,
 drop one) without it ever surfacing as a user-visible change.
 
-PUBLIC_NAME / PUBLIC_VERSION are the only two lines that should need
-editing when you bump the product version.
+The public name comes from identity.py (DISPLAY_NAME).
 """
-PUBLIC_NAME = "Lite"
-PUBLIC_VERSION = "1.23"
+from identity import DISPLAY_NAME
+
+# The user-facing identity is "lite1.2" (see identity.py). Change it there
+# (or via ASSISTANT_DISPLAY_NAME); provider/model ids live in config.py.
+PUBLIC_NAME = DISPLAY_NAME
 
 
 def public_model_label() -> str:
-    return f"{PUBLIC_NAME} {PUBLIC_VERSION}"
+    return PUBLIC_NAME
 
 
 def scrub_result_for_user(result: dict) -> dict:

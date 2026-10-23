@@ -12,6 +12,7 @@ from utils.errors import RateLimitError, ProviderUnavailableError, AllProvidersF
 from utils.multimodal import extract_text, has_image
 from emotion.engine import EmotionEngine
 from access.tiers import SubscriptionStore
+from identity import IDENTITY_SYSTEM_PROMPT, is_identity_question, identity_reply
 
 from providers.claude_provider import ClaudeProvider
 from providers.gemini_provider import GeminiProvider
@@ -159,6 +160,17 @@ class AIRouter:
         intent = intent or self.route_for(user_text)
         route = self.routes.get(intent, self.routes["default"])
 
+        # "Which model are you?" is answered locally with the app's display
+        # name so a provider's own name can never leak. No provider is called.
+        if not has_image(messages) and is_identity_question(user_text):
+            return {
+                "reply": identity_reply(),
+                "provider": "identity",
+                "intent": "identity",
+                "attempts": [],
+                "emotion": None,
+            }
+
         call_messages = messages
         emotion_snapshot = None
         if persona:
@@ -167,6 +179,9 @@ class AIRouter:
             directive = self.emotion_engine.process_turn(session_id, user_text)
             call_messages = self._inject_directive(messages, directive)
             emotion_snapshot = self.emotion_engine.snapshot(session_id)
+
+        # Tell whichever provider answers what the assistant is called.
+        call_messages = self._inject_directive(call_messages, IDENTITY_SYSTEM_PROMPT)
 
         chain = self._build_chain(route, call_messages, user_id)
         attempts = []
