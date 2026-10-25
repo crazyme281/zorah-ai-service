@@ -165,7 +165,7 @@ class AIRouter:
         # name so a provider's own name can never leak. No provider is called.
         if not has_image(messages) and is_identity_question(user_text):
             return {
-                "reply": identity_reply(),
+                "reply": identity_reply(user_text),
                 "provider": "identity",
                 "intent": "identity",
                 "attempts": [],
