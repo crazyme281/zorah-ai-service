@@ -31,6 +31,7 @@ from access import codefix_pipeline
 from training import engine as training_engine
 from config import MAX_UPLOAD_ZIP_BYTES
 from branding import scrub_result_for_user
+import learned
 from config import API_KEYS, FLUTTERWAVE_SECRET_KEY, REQUEST_TIMEOUT, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 from utils.errors import AllProvidersFailedError
 
@@ -123,6 +124,23 @@ class ChatResponse(BaseModel):
 
 class TranscribeResponse(BaseModel):
     text: str
+
+
+# ── AI Learning module ────────────────────────────────────────────────────
+# Public, read-only educational content (no user data, no secrets). The same
+# file also supplies what the learned model knows, so the two cannot drift.
+@app.get("/learning/topics")
+def learning_topics():
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "learned", "content", "topics.json")
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    return {"topics": data["topics"]}
+
+
+@app.get("/learning/model-info")
+def learning_model_info():
+    """Metadata, held-out metrics and live counters of the learned model."""
+    return learned.model_info()
 
 
 @app.get("/health")

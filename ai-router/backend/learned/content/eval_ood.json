@@ -1,0 +1,26 @@
+{
+ "ood_val": [
+  "what is the weather today",
+  "write a python function to reverse a string",
+  "who won the football match yesterday",
+  "how do I cook jollof rice",
+  "translate good morning into french",
+  "what is the capital of Nigeria",
+  "tell me a joke",
+  "help me write a cover letter",
+  "how much does the Go plan cost",
+  "what is 15 times 12"
+ ],
+ "ood_test": [
+  "recommend a good laptop for students",
+  "write a poem about the ocean",
+  "how do I fix this react build error",
+  "summarise the plot of Romeo and Juliet",
+  "what time is it in Lagos",
+  "build a decision tree classifier in sklearn for my csv file",
+  "analyse the sentiment of this tweet: I love Mondays",
+  "what is the best way to learn guitar",
+  "explain how photosynthesis works",
+  "can you write sql to join two tables"
+ ]
+}

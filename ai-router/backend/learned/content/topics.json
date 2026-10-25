@@ -1,0 +1,691 @@
+{
+ "version": 1,
+ "topics": [
+  {
+   "id": "decision-trees",
+   "title": "Decision Trees",
+   "icon": "git-branch",
+   "summary": "A decision tree predicts by asking a chain of yes/no questions about the data, following one branch per answer until it reaches a final answer.",
+   "image": {
+    "key": "random-forest",
+    "alt": "Animation frame titled Random Forest: many random trees voting, with a Python snippet that grows trees on 500 customers.",
+    "caption": "A random forest grows many decision trees and takes a majority vote (example from your screenshots)."
+   },
+   "terms": [
+    {
+     "term": "Root node",
+     "definition": "The first question, at the top of the tree. Every prediction starts here."
+    },
+    {
+     "term": "Decision (internal) node",
+     "definition": "A question about one feature, such as 'Exam score ≥ 50?'."
+    },
+    {
+     "term": "Branch",
+     "definition": "One possible answer to a question (Yes/No), leading to the next node."
+    },
+    {
+     "term": "Leaf node",
+     "definition": "An end point that holds the prediction, for example Pass or Fail."
+    },
+    {
+     "term": "Feature / threshold",
+     "definition": "A measurable input (exam score) and the cut-off value the question compares against (50)."
+    },
+    {
+     "term": "Gini impurity / information gain",
+     "definition": "Scores a training algorithm uses to pick the question that separates the classes best."
+    },
+    {
+     "term": "Overfitting",
+     "definition": "A tree so deep it memorises the training data and does badly on new data."
+    },
+    {
+     "term": "Random forest",
+     "definition": "Many trees trained on random samples of the data; the final answer is their majority vote."
+    }
+   ],
+   "example": {
+    "title": "Predict pass or fail",
+    "body": "A teacher writes down a rule set: if the exam score is at least 50 and attendance is at least 75%, predict Pass; otherwise predict Fail. The tree below encodes exactly that.",
+    "note": "This tree is written by hand to teach the idea. It was NOT trained on data. A trained tree chooses its own questions and thresholds from examples."
+   },
+   "io": {
+    "input": "A record of features, for example exam score 62 and attendance 60%.",
+    "steps": [
+     "Start at the root node.",
+     "Compare the feature with the node's threshold.",
+     "Follow the Yes or No branch.",
+     "Repeat until you reach a leaf."
+    ],
+    "output": "The leaf's label, here Fail (score passes, but attendance 60% is below 75%)."
+   },
+   "diagram": {
+    "kind": "tree",
+    "title": "Hand-made example tree (not trained)"
+   },
+   "tree": {
+    "q": "Exam score ≥ 50?",
+    "yes": {
+     "q": "Attendance ≥ 75%?",
+     "yes": {
+      "leaf": "Pass"
+     },
+     "no": {
+      "leaf": "Fail"
+     }
+    },
+    "no": {
+     "leaf": "Fail"
+    }
+   },
+   "exercise": {
+    "prompt": "A student scored 48 and attended 90% of classes. Using the tree, what is the prediction, and which nodes did you visit?",
+    "hint": "Start at the root and answer one question at a time.",
+    "solution": "Fail. Root: score 48 ≥ 50? No, so you go straight to the Fail leaf. Attendance is never checked."
+   },
+   "quiz": [
+    {
+     "q": "What does a leaf node contain?",
+     "options": [
+      "A question",
+      "The final prediction",
+      "The training data",
+      "A threshold only"
+     ],
+     "answer": 1,
+     "why": "Leaves are end points that hold the predicted outcome."
+    },
+    {
+     "q": "In the example tree, a student scores 62 with 60% attendance. What is predicted?",
+     "options": [
+      "Pass",
+      "Fail",
+      "Unknown",
+      "Pass with merit"
+     ],
+     "answer": 1,
+     "why": "62 ≥ 50 is Yes, but attendance 60% < 75% is No, which leads to Fail."
+    },
+    {
+     "q": "Why can a very deep tree perform badly on new data?",
+     "options": [
+      "It is too small",
+      "It overfits the training data",
+      "It has no root",
+      "It uses colours"
+     ],
+     "answer": 1,
+     "why": "Deep trees memorise noise in the training set (overfitting)."
+    },
+    {
+     "q": "How does a random forest make its final decision?",
+     "options": [
+      "It picks the deepest tree",
+      "Majority vote of many trees",
+      "It averages the questions",
+      "It asks the user"
+     ],
+     "answer": 1,
+     "why": "Each tree votes and the most common answer wins."
+    }
+   ]
+  },
+  {
+   "id": "word-analysis",
+   "title": "Word Analysis (NLP)",
+   "icon": "text",
+   "summary": "Natural language processing turns text into numbers a model can work with, so it can find keywords, judge sentiment, sort topics and summarise.",
+   "image": {
+    "key": "nlp-word-vectors",
+    "alt": "Each word of 'Never gonna give you up' shown as an arrow (vector) on a 2D grid, with x_i in R^d above.",
+    "caption": "Each word becomes a vector x_i ∈ ℝ^d. Real models use hundreds of dimensions; the picture shows two."
+   },
+   "terms": [
+    {
+     "term": "Token",
+     "definition": "A small piece of text, usually a word or part of a word."
+    },
+    {
+     "term": "Tokenization",
+     "definition": "Splitting text into tokens."
+    },
+    {
+     "term": "Stop words",
+     "definition": "Very common words (the, is, of) often ignored when finding keywords."
+    },
+    {
+     "term": "Embedding (word vector)",
+     "definition": "A list of numbers that represents a word's meaning, so similar words sit close together."
+    },
+    {
+     "term": "TF-IDF",
+     "definition": "A score for how important a word is in one text compared with many texts."
+    },
+    {
+     "term": "Sentiment analysis",
+     "definition": "Predicting whether text is positive, negative or neutral."
+    },
+    {
+     "term": "Named entity",
+     "definition": "A real-world thing mentioned in text, such as a person, place or company."
+    },
+    {
+     "term": "Attention",
+     "definition": "A mechanism letting a model weigh which other words matter most when reading each word."
+    }
+   ],
+   "example": {
+    "title": "Is this review positive?",
+    "body": "The sentence 'The lesson was clear and helpful' is split into tokens, each token becomes a vector, and a classifier outputs a prediction such as positive with a probability.",
+    "note": "Sentiment is a prediction with uncertainty, not a fact. Sarcasm and context can fool it."
+   },
+   "io": {
+    "input": "Raw text, for example a sentence or review.",
+    "steps": [
+     "Clean the text (case, punctuation).",
+     "Tokenize into words or sub-words.",
+     "Convert each token to a vector (embedding).",
+     "The model combines the vectors and scores each possible label."
+    ],
+    "output": "A label (positive/negative), keywords or a summary, ideally with a confidence value."
+   },
+   "diagram": {
+    "kind": "flow",
+    "title": "From text to prediction"
+   },
+   "exercise": {
+    "prompt": "Tokenize 'Never gonna give you up' and say how many tokens you get. Would 'the' and 'of' be useful keywords in a longer text?",
+    "hint": "Split on spaces; think about how common stop words are.",
+    "solution": "Five tokens: Never, gonna, give, you, up. Stop words like 'the' and 'of' appear everywhere, so they rarely work as keywords."
+   },
+   "quiz": [
+    {
+     "q": "What is tokenization?",
+     "options": [
+      "Encrypting text",
+      "Splitting text into tokens",
+      "Translating text",
+      "Deleting stop words"
+     ],
+     "answer": 1,
+     "why": "Tokenization breaks text into words or sub-words."
+    },
+    {
+     "q": "What does an embedding represent?",
+     "options": [
+      "A word's spelling",
+      "A word as a list of numbers capturing meaning",
+      "A word's length",
+      "A grammar rule"
+     ],
+     "answer": 1,
+     "why": "Embeddings place words as vectors; similar meanings end up close."
+    },
+    {
+     "q": "A sentiment model says 'positive, 0.62'. How should you treat that?",
+     "options": [
+      "As a certain fact",
+      "As a prediction with uncertainty",
+      "As an error",
+      "As a keyword"
+     ],
+     "answer": 1,
+     "why": "Classifier outputs are probabilities, not guarantees."
+    },
+    {
+     "q": "Which is usually a poor keyword?",
+     "options": [
+      "Photosynthesis",
+      "Invoice",
+      "The",
+      "Mortgage"
+     ],
+     "answer": 2,
+     "why": "Stop words like 'the' occur in almost every text."
+    }
+   ]
+  },
+  {
+   "id": "picture-analysis",
+   "title": "Picture Analysis (Computer Vision)",
+   "icon": "image",
+   "summary": "Computer vision turns an image into numbers (pixels), finds patterns in them, and outputs labels, objects or descriptions.",
+   "image": {
+    "key": "vision-patch-embedding",
+    "alt": "A 4x4 pixel patch with 3 colour channels flattened into 48 numbers, multiplied by a learned matrix W to give a vector.",
+    "caption": "Patch embedding: a 4×4×3 patch = 48 numbers, turned into a vector by a learned matrix W."
+   },
+   "terms": [
+    {
+     "term": "Pixel",
+     "definition": "The smallest dot of an image, stored as numbers."
+    },
+    {
+     "term": "Channel (RGB)",
+     "definition": "The red, green and blue values (0–255) that make up a colour pixel."
+    },
+    {
+     "term": "Patch",
+     "definition": "A small square block of pixels cut from the image."
+    },
+    {
+     "term": "Patch embedding",
+     "definition": "Flattening a patch into numbers and multiplying by a learned matrix to get a vector."
+    },
+    {
+     "term": "Image classification",
+     "definition": "Giving the whole image one label, such as 'cat'."
+    },
+    {
+     "term": "Object detection",
+     "definition": "Finding objects and drawing a bounding box around each."
+    },
+    {
+     "term": "Confidence score",
+     "definition": "How strongly the model favours its answer. It is not a guarantee of being right."
+    },
+    {
+     "term": "Convolution / feature map",
+     "definition": "A sliding filter that highlights edges and textures in an image."
+    }
+   ],
+   "example": {
+    "title": "One patch becomes a vector",
+    "body": "A 4×4 patch with 3 colour channels has 48 numbers (R 220, G 234, B 247, …). Multiplying them by a learned matrix W gives a shorter vector. A vision transformer does this for every patch, then lets attention compare patches.",
+    "note": "The numbers in the picture are an illustration from your screenshot, not output from this app's models."
+   },
+   "io": {
+    "input": "An image file (pixels with colour channels).",
+    "steps": [
+     "Resize and normalise the image.",
+     "Cut it into patches.",
+     "Flatten each patch and embed it as a vector.",
+     "Layers (attention or convolution) combine the patches."
+    ],
+    "output": "A label, or boxes with labels, and a confidence score when the model provides one."
+   },
+   "diagram": {
+    "kind": "flow",
+    "title": "From pixels to prediction"
+   },
+   "exercise": {
+    "prompt": "How many numbers describe an 8×8 RGB patch before embedding?",
+    "hint": "pixels × channels.",
+    "solution": "8 × 8 × 3 = 192 numbers."
+   },
+   "quiz": [
+    {
+     "q": "How many numbers describe a 4×4 RGB patch?",
+     "options": [
+      "16",
+      "32",
+      "48",
+      "64"
+     ],
+     "answer": 2,
+     "why": "4 × 4 pixels × 3 colour channels = 48."
+    },
+    {
+     "q": "Classification differs from detection because classification…",
+     "options": [
+      "draws boxes",
+      "labels the whole image",
+      "needs no data",
+      "only works on video"
+     ],
+     "answer": 1,
+     "why": "Detection finds and boxes each object; classification gives one label."
+    },
+    {
+     "q": "A confidence score of 0.95 means…",
+     "options": [
+      "The answer is certainly right",
+      "The model strongly favours that answer",
+      "The image is 95% clear",
+      "95 objects were found"
+     ],
+     "answer": 1,
+     "why": "Confidence is the model's own score, and models can be confidently wrong."
+    },
+    {
+     "q": "What does the matrix W in patch embedding do?",
+     "options": [
+      "Resizes the file",
+      "Maps patch numbers to a vector, and is learned",
+      "Compresses to JPEG",
+      "Chooses the colours"
+     ],
+     "answer": 1,
+     "why": "W is learned during training and converts raw patch values into useful features."
+    }
+   ]
+  },
+  {
+   "id": "training-evaluation",
+   "title": "Model Training and Evaluation",
+   "icon": "speedometer",
+   "summary": "Training fits a model to examples; evaluation checks it on data it has never seen, so you know whether it really learned or just memorised.",
+   "image": {
+    "key": "random-forest",
+    "alt": "Random forest animation with code that trains 100 trees on the first 400 of 500 customers and tests on the last 100.",
+    "caption": "From the screenshot's code: 500 customers, trees grown on 400, accuracy checked on the held-out last 100."
+   },
+   "terms": [
+    {
+     "term": "Dataset, feature, label",
+     "definition": "Examples with measurable inputs (features) and the answer to learn (label)."
+    },
+    {
+     "term": "Training / validation / test set",
+     "definition": "Train fits the model, validation tunes it, test gives a final honest score on unseen data."
+    },
+    {
+     "term": "Hyperparameter",
+     "definition": "A setting chosen before training, such as tree depth or number of trees."
+    },
+    {
+     "term": "Overfitting / underfitting",
+     "definition": "Memorising the training set versus being too simple to learn the pattern."
+    },
+    {
+     "term": "Accuracy",
+     "definition": "Share of predictions that are correct."
+    },
+    {
+     "term": "Precision / recall",
+     "definition": "Precision: of the predicted positives, how many are right. Recall: of the real positives, how many were found."
+    },
+    {
+     "term": "Confusion matrix",
+     "definition": "A table of correct and wrong predictions per class."
+    },
+    {
+     "term": "Data leakage",
+     "definition": "Test information sneaking into training, which inflates scores."
+    },
+    {
+     "term": "Prompting vs fine-tuning",
+     "definition": "Prompting only gives instructions to a finished model. Fine-tuning updates its weights with new data. Training from scratch builds a model from random weights."
+    }
+   ],
+   "example": {
+    "title": "500 customers, 100 trees",
+    "body": "Split 500 customer records: 400 for training, 100 held out for testing. Grow 100 random trees on the 400, let them vote, and measure accuracy only on the held-out 100. That honest score estimates how it behaves on new customers.",
+    "note": "Sending prompts to a hosted language model is inference. It is not training or fine-tuning."
+   },
+   "io": {
+    "input": "A labelled dataset (features plus answers).",
+    "steps": [
+     "Validate and clean the data.",
+     "Split into train, validation and test.",
+     "Pick an algorithm and train it.",
+     "Tune hyperparameters on validation.",
+     "Score once on the test set, then save and monitor."
+    ],
+    "output": "A saved model, its metrics and metadata, used for predictions."
+   },
+   "diagram": {
+    "kind": "flow",
+    "title": "The training pipeline"
+   },
+   "exercise": {
+    "prompt": "A model catches 30 of 50 real fraud cases and wrongly flags 10 normal cases (so 40 flags in total). Compute precision and recall.",
+    "hint": "Precision = correct flags ÷ all flags. Recall = correct flags ÷ real cases.",
+    "solution": "Precision = 30 ÷ 40 = 0.75. Recall = 30 ÷ 50 = 0.60."
+   },
+   "quiz": [
+    {
+     "q": "Why keep a separate test set?",
+     "options": [
+      "To train faster",
+      "To measure performance on unseen data",
+      "To store backups",
+      "To add features"
+     ],
+     "answer": 1,
+     "why": "Scoring on training data hides overfitting."
+    },
+    {
+     "q": "Training accuracy 99%, test accuracy 70%. Most likely problem?",
+     "options": [
+      "Underfitting",
+      "Overfitting",
+      "Perfect model",
+      "Missing labels only"
+     ],
+     "answer": 1,
+     "why": "A big train/test gap signals memorisation."
+    },
+    {
+     "q": "100 test samples, 80 correct. Accuracy?",
+     "options": [
+      "20%",
+      "80%",
+      "8%",
+      "100%"
+     ],
+     "answer": 1,
+     "why": "80 ÷ 100 = 80%."
+    },
+    {
+     "q": "Does sending prompts to a language model train it?",
+     "options": [
+      "Yes, always",
+      "No, that is inference",
+      "Only on Fridays",
+      "Yes, it fine-tunes it"
+     ],
+     "answer": 1,
+     "why": "Prompting changes the input, not the model's weights."
+    }
+   ]
+  }
+ ],
+ "qa": [
+  {
+   "id": "dt_what",
+   "topic": "decision-trees",
+   "answer": "A decision tree predicts by asking a chain of yes/no questions about the input. Each question is a node, each answer is a branch, and a leaf holds the predicted outcome, such as Pass or Fail.",
+   "questions": [
+    "what is a decision tree",
+    "explain decision trees",
+    "how does a decision tree work",
+    "define decision tree",
+    "can you tell me what decision trees are"
+   ]
+  },
+  {
+   "id": "dt_parts",
+   "topic": "decision-trees",
+   "answer": "The root node is the first question at the top. Decision nodes ask further questions, branches are the Yes/No answers, and leaf nodes at the ends hold the final prediction.",
+   "questions": [
+    "what is a root node",
+    "what are leaf nodes in a decision tree",
+    "difference between root node and leaf node",
+    "what are the parts of a decision tree",
+    "explain nodes and branches"
+   ]
+  },
+  {
+   "id": "dt_split",
+   "topic": "decision-trees",
+   "answer": "When training, the algorithm tries possible questions and keeps the one that separates the classes best, measured with Gini impurity or information gain. It repeats this on each branch until it reaches a stopping rule.",
+   "questions": [
+    "how does a decision tree choose which question to ask",
+    "what is gini impurity",
+    "what is information gain",
+    "how are splits chosen in a tree",
+    "explain gini and entropy for splitting"
+   ]
+  },
+  {
+   "id": "dt_forest",
+   "topic": "decision-trees",
+   "answer": "A random forest trains many decision trees on random samples of the data and takes a majority vote of their predictions. Voting cancels out each tree's individual mistakes, so it overfits less than one deep tree.",
+   "questions": [
+    "what is a random forest",
+    "how does a random forest work",
+    "random forest vs decision tree",
+    "why use many trees instead of one",
+    "explain majority voting in random forests"
+   ]
+  },
+  {
+   "id": "nlp_what",
+   "topic": "word-analysis",
+   "answer": "Natural language processing (NLP) is how computers work with text. It converts words into numbers, then uses models to find keywords, judge sentiment, sort topics or summarise.",
+   "questions": [
+    "what is natural language processing",
+    "what is nlp",
+    "explain word analysis",
+    "how do computers understand text",
+    "define nlp"
+   ]
+  },
+  {
+   "id": "nlp_token",
+   "topic": "word-analysis",
+   "answer": "Tokenization splits text into small pieces called tokens, usually words or parts of words. Models read tokens, not raw letters.",
+   "questions": [
+    "what is tokenization",
+    "what are tokens in nlp",
+    "how is text split into tokens",
+    "explain tokenizing a sentence",
+    "what does a tokenizer do"
+   ]
+  },
+  {
+   "id": "nlp_embed",
+   "topic": "word-analysis",
+   "answer": "An embedding turns a word into a list of numbers (a vector) so that words with similar meanings sit close together. This lets a model compare and combine words mathematically.",
+   "questions": [
+    "what is a word embedding",
+    "how do computers turn words into numbers",
+    "what are word vectors",
+    "explain embeddings",
+    "why are words represented as vectors"
+   ]
+  },
+  {
+   "id": "nlp_sent",
+   "topic": "word-analysis",
+   "answer": "Sentiment analysis predicts whether text is positive, negative or neutral. It is a prediction with uncertainty, because sarcasm and context can mislead it.",
+   "questions": [
+    "what is sentiment analysis",
+    "how does sentiment analysis work",
+    "how can a computer tell if text is positive or negative",
+    "explain sentiment classification",
+    "define sentiment analysis"
+   ]
+  },
+  {
+   "id": "cv_what",
+   "topic": "picture-analysis",
+   "answer": "Computer vision lets computers analyse images. An image is stored as numbers, a model finds patterns in them, and it outputs labels, detected objects or descriptions.",
+   "questions": [
+    "what is computer vision",
+    "how do computers see images",
+    "explain picture analysis",
+    "what is image analysis in ai",
+    "define computer vision"
+   ]
+  },
+  {
+   "id": "cv_pixels",
+   "topic": "picture-analysis",
+   "answer": "A pixel is the smallest dot of an image. In colour images each pixel has three numbers, the red, green and blue channels, usually from 0 to 255.",
+   "questions": [
+    "what is a pixel",
+    "what are rgb channels",
+    "how is an image stored as numbers",
+    "how does a computer represent a picture",
+    "explain pixels and colour channels"
+   ]
+  },
+  {
+   "id": "cv_patch",
+   "topic": "picture-analysis",
+   "answer": "Vision transformers cut an image into small square patches, flatten each patch into numbers (a 4x4 RGB patch gives 48), and multiply by a learned matrix to get a vector. Attention then compares the patches.",
+   "questions": [
+    "what is patch embedding",
+    "how do vision transformers split an image",
+    "what are image patches",
+    "explain patches to vectors",
+    "how does attention work on images"
+   ]
+  },
+  {
+   "id": "cv_detect",
+   "topic": "picture-analysis",
+   "answer": "Image classification gives the whole image one label. Object detection finds each object and draws a bounding box around it. A confidence score is the model's own certainty, and it can still be wrong.",
+   "questions": [
+    "difference between image classification and object detection",
+    "what is object detection",
+    "what is a bounding box",
+    "what does a confidence score mean",
+    "classification vs detection"
+   ]
+  },
+  {
+   "id": "tr_split",
+   "topic": "training-evaluation",
+   "answer": "Data is split into a training set (fit the model), a validation set (tune settings) and a test set (one final honest score on unseen data). Keeping them separate reveals overfitting.",
+   "questions": [
+    "what is a train test split",
+    "why split data into training validation and test sets",
+    "what is a validation set",
+    "what is a test set for",
+    "explain training validation and test data"
+   ]
+  },
+  {
+   "id": "tr_over",
+   "topic": "training-evaluation",
+   "answer": "Overfitting is when a model memorises its training data and does badly on new data. Underfitting is when it is too simple to learn the pattern. Fixes include more data, simpler models, limiting tree depth and validating on held-out data.",
+   "questions": [
+    "what is overfitting",
+    "why does my model do well on training data but badly on new data",
+    "how do i stop overfitting",
+    "explain overfitting and underfitting",
+    "what is underfitting"
+   ]
+  },
+  {
+   "id": "tr_metrics",
+   "topic": "training-evaluation",
+   "answer": "Accuracy is the share of correct predictions. Precision is how many predicted positives were right, recall is how many real positives were found, and F1 combines the two. A confusion matrix shows all the counts.",
+   "questions": [
+    "what is accuracy precision and recall",
+    "what is the difference between precision and recall",
+    "what is an f1 score",
+    "how do you evaluate a classification model",
+    "what is a confusion matrix"
+   ]
+  },
+  {
+   "id": "tr_kinds",
+   "topic": "training-evaluation",
+   "answer": "Prompting only gives instructions to a finished model; that is inference, not training. Fine-tuning updates a model's weights with new examples. Training from scratch builds a model from random weights.",
+   "questions": [
+    "what is the difference between prompting and fine-tuning",
+    "does prompting an ai train it",
+    "what is fine-tuning",
+    "what does training from scratch mean",
+    "is sending prompts to a model the same as training it"
+   ]
+  },
+  {
+   "id": "sys_confidence",
+   "topic": "training-evaluation",
+   "answer": "I keep a small set of learned knowledge about AI basics. For each question I compute a similarity-based confidence score; when it is above a threshold calibrated on held-out examples I answer from what I learned, and otherwise your message goes to the app's other models.",
+   "questions": [
+    "when are you sure of an answer",
+    "when do you use what you have learned",
+    "how do you decide to answer by yourself",
+    "what happens when you are not sure",
+    "do you fall back to other models when unsure"
+   ]
+  }
+ ]
+}

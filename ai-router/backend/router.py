@@ -13,6 +13,7 @@ from utils.multimodal import extract_text, has_image
 from emotion.engine import EmotionEngine
 from access.tiers import SubscriptionStore
 from identity import IDENTITY_SYSTEM_PROMPT, is_identity_question, identity_reply
+import learned
 
 from providers.claude_provider import ClaudeProvider
 from providers.gemini_provider import GeminiProvider
@@ -171,6 +172,21 @@ class AIRouter:
                 "emotion": None,
             }
 
+        # Learned knowledge: answer from it only when it is sure. When it is
+        # not sure (or the question is outside what it learned) the message
+        # continues to the normal provider chain below, unchanged.
+        if not has_image(messages):
+            hit = learned.answer_if_confident(user_text)
+            if hit:
+                return {
+                    "reply": hit["reply"],
+                    "provider": "learned",
+                    "intent": "learned",
+                    "attempts": [],
+                    "emotion": None,
+                    "confidence": hit["confidence"],
+                }
+
         call_messages = messages
         emotion_snapshot = None
         if persona:
@@ -203,6 +219,11 @@ class AIRouter:
                 provider_messages = self._flatten_text_only(call_messages)
             try:
                 reply = provider.chat(provider_messages, **kwargs)
+                # Remember vetted standalone Q&A so the learned model can answer
+                # it next time (never raises; see learned/chat_learning.py).
+                if (not image_present and isinstance(reply, str)
+                        and sum(1 for m in messages if m.get("role") == "user") == 1):
+                    learned.record_fallback(user_text, reply, provider_name, session_id)
                 return {
                     "reply": reply,
                     "provider": provider_name,

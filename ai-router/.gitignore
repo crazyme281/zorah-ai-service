@@ -1,7 +1,14 @@
 __pycache__/
 *.pyc
+.pytest_cache/
 .venv/
 venv/
 .env
 .env.*
 !.env.example
+node_modules/
+dist/
+
+# Users' chat questions learned by the AI must never be committed
+backend/learned/artifacts/chat_learned.json
+backend/learned/artifacts/*.tmp
