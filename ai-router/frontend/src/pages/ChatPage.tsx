@@ -35,7 +35,6 @@ import { useVoiceInput } from "../hooks/useVoiceInput";
 import { prepareImage, type Attachment } from "../lib/attachments";
 import { TopBar } from "../components/TopBar";
 import { ZorahLogo } from "../components/ZorahLogo";
-import { ASSISTANT_NAME } from "../lib/modelIdentity";
 
 /** Treat "within this many px of the bottom" as the user following along. */
 const STICK_THRESHOLD = 120;
@@ -288,7 +287,7 @@ export function ChatPage() {
             <div className="welcome">
               <ZorahLogo size={124} variant="full" />
               <h2 className="welcome__greeting">
-                Hello, I&rsquo;m {ASSISTANT_NAME} <span className="spark">&#10022;</span>
+                Hello, I&rsquo;m Zorah <span className="spark">&#10022;</span>
               </h2>
               <p className="welcome__sub">
                 Ask me anything, or share an image. I&rsquo;m here to help.
@@ -343,7 +342,7 @@ export function ChatPage() {
                     )}
 
                     {m.streaming && !m.content && (
-                      <div className="typing" aria-label={`${ASSISTANT_NAME} is thinking`}>
+                      <div className="typing" aria-label="Zorah is thinking">
                         <i />
                         <i />
                         <i />
