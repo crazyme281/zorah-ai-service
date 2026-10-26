@@ -2,6 +2,7 @@ import { useState } from "react";
 import { IonPage, IonContent, IonIcon, IonSpinner, useIonRouter, useIonViewWillEnter } from "@ionic/react";
 import { schoolOutline, lockClosedOutline, trashOutline, arrowForward, sparklesOutline, chevronBack } from "ionicons/icons";
 import { TopBar } from "../components/TopBar";
+import "./training.css";
 import { usePlan } from "../hooks/usePlan";
 import {
   api, createCourse, deleteCourse, listCourses, courseStats, looksLikeCoding, guessLanguage,

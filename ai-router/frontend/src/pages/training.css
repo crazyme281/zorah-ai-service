@@ -1,0 +1,147 @@
+/* Training — locked (free plan) screen and the plan-check loader.
+   Uses the app's --zr-* tokens, same look as the Upgrade page. */
+
+.tr-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px 18px 60px;
+}
+
+/* ── Checking your plan… ─────────────────────────────── */
+.tr-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--zr-text-dim);
+  text-align: center;
+}
+.tr-loading--big {
+  padding: 90px 0;
+}
+.tr-loading ion-spinner {
+  color: var(--zr-gold);
+  width: 36px;
+  height: 36px;
+}
+.tr-loading p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+/* ── Locked card ─────────────────────────────────────── */
+.tr-locked {
+  margin: 36px auto 0;
+  padding: 34px 22px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background:
+    radial-gradient(120% 90% at 50% 0%, var(--zr-gold-wash) 0%, transparent 60%),
+    var(--zr-panel);
+  border: 1px solid var(--zr-line-gold);
+  border-radius: var(--zr-radius-lg);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+.tr-locked > ion-icon {
+  width: 68px;
+  height: 68px;
+  padding: 18px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  color: var(--zr-gold-bright);
+  background: var(--zr-gold-wash);
+  border: 1px solid var(--zr-line-gold);
+}
+.tr-locked h2 {
+  margin: 20px 0 10px;
+  font-family: var(--font-display, inherit);
+  font-size: 1.4rem;
+  line-height: 1.25;
+  font-weight: 600;
+  color: var(--zr-text);
+}
+.tr-locked p {
+  max-width: 46ch;
+  margin: 0 0 24px;
+  font-size: 0.97rem;
+  line-height: 1.65;
+  color: var(--zr-text-dim);
+}
+.tr-locked .tr-btn {
+  width: 100%;
+  max-width: 320px;
+}
+.tr-locked .tr-muted {
+  margin: 20px 0 0;
+}
+
+/* ── Shared small pieces ─────────────────────────────── */
+.tr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 24px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--zr-text);
+  background: var(--zr-raised);
+  border: 1px solid var(--zr-line-gold);
+  border-radius: var(--zr-radius-pill);
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.tr-btn:hover {
+  border-color: var(--zr-gold);
+}
+.tr-btn:active {
+  transform: scale(0.98);
+}
+.tr-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.tr-btn:focus-visible,
+.tr-link:focus-visible {
+  outline: 2px solid var(--zr-gold-bright);
+  outline-offset: 3px;
+}
+.tr-btn--gold {
+  color: var(--zr-gold-ink);
+  background: var(--zr-gold-gradient);
+  border-color: transparent;
+  box-shadow: 0 6px 22px rgba(214, 156, 46, 0.28);
+}
+.tr-btn--gold:hover {
+  filter: brightness(1.06);
+  border-color: transparent;
+}
+.tr-btn ion-icon {
+  font-size: 1.15em;
+}
+
+.tr-muted {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--zr-text-dim);
+}
+.tr-link {
+  padding: 6px 4px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--zr-gold-bright);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.tr-link:hover {
+  color: var(--zr-gold-pale);
+}
