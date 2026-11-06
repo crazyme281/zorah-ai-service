@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import os
+from contextlib import asynccontextmanager
 from typing import Any
 
 import requests
@@ -29,9 +30,14 @@ from access.db import select
 from access import codefix_db
 from access import codefix_pipeline
 from training import engine as training_engine
-from config import MAX_UPLOAD_ZIP_BYTES
+from config import MAX_UPLOAD_ZIP_BYTES, MAX_CHAT_MESSAGES, MAX_CHAT_TEXT_CHARS, SLEEP_INTERVAL_S
 from branding import scrub_result_for_user
 import learned
+from control import get_controls
+from ops import capacity as capacity_planner
+from safety.permissions import AuditEntry, AuditLog
+from safety.autonomy import ApprovalQueue
+from learned import provenance as learned_provenance
 from config import API_KEYS, FLUTTERWAVE_SECRET_KEY, REQUEST_TIMEOUT, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 from utils.errors import AllProvidersFailedError
 
@@ -47,7 +53,23 @@ image_store = ImageStore(subscriptions)
 flutterwave = FlutterwaveClient(FLUTTERWAVE_SECRET_KEY) if FLUTTERWAVE_SECRET_KEY else None
 router = AIRouter(emotion_engine=emotion_engine, subscriptions=subscriptions)
 
-app = FastAPI(title="Lite AI Router")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Sleep/consolidation of the learned model on a schedule (0 = off).
+    if learned.start_sleep_scheduler(SLEEP_INTERVAL_S):
+        logging.info("learned: sleep cycle scheduled every %ss", SLEEP_INTERVAL_S)
+    yield
+
+
+app = FastAPI(title="Lite AI Router", lifespan=lifespan)
+
+# Control plane (kill switch, budget caps, circuit breakers, decision records)
+# is shared with the router; the audit log and approval queue back the admin
+# endpoints at /admin/ops/*.
+controls = get_controls()
+audit_log = AuditLog()
+approvals = ApprovalQueue()
+
 
 # Comma-separated list, e.g. "https://your-frontend.onrender.com,http://localhost:5173"
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
@@ -102,6 +124,36 @@ def require_user(authorization: str | None = Header(default=None)) -> str:
     return resp.json()["id"]
 
 
+def _client_ip(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for", "")
+    return (fwd.split(",")[0].strip() or (request.client.host if request.client else "unknown"))
+
+
+def enforce_limits(request: Request, session_id: str | None = None) -> None:
+    """Per-IP and per-session sliding-window limits. Raises 429 with Retry-After."""
+    ok, wait = controls.ip_limiter.hit(_client_ip(request))
+    if ok and session_id:
+        ok, wait = controls.session_limiter.hit(f"s:{session_id}")
+    if not ok:
+        raise HTTPException(status_code=429, detail="Too many requests - please slow down a little.",
+                            headers={"Retry-After": str(wait)})
+
+
+def validate_chat(messages: list[dict]) -> None:
+    """Input validation: bounded number of messages and amount of text.
+    Image data is not counted - it has its own upload limits."""
+    if not messages:
+        raise HTTPException(status_code=422, detail="messages must not be empty")
+    if len(messages) > MAX_CHAT_MESSAGES:
+        raise HTTPException(status_code=413, detail=f"too many messages (max {MAX_CHAT_MESSAGES})")
+    total = 0
+    for m in messages:
+        c = m["content"]
+        total += len(c) if isinstance(c, str) else sum(len(b.get("text") or "") for b in c if isinstance(b, dict))
+    if total > MAX_CHAT_TEXT_CHARS:
+        raise HTTPException(status_code=413, detail="conversation is too long - start a new chat")
+
+
 class ChatMessage(BaseModel):
     role: str
     # A plain string for ordinary text turns, or a list of
@@ -149,8 +201,10 @@ def health():
 
 
 @app.post("/chat", response_model=ChatResponse)
-def chat(req: ChatRequest):
+def chat(req: ChatRequest, request: Request):
+    enforce_limits(request, req.session_id)
     messages = [m.model_dump() for m in req.messages]
+    validate_chat(messages)
     try:
         result = router.chat(
             messages,
@@ -174,8 +228,10 @@ CHUNK_DELAY_S = 0.05
 
 
 @app.post("/chat/stream")
-async def chat_stream(req: ChatRequest):
+async def chat_stream(req: ChatRequest, request: Request):
+    enforce_limits(request, req.session_id)
     messages = [m.model_dump() for m in req.messages]
+    validate_chat(messages)
 
     async def event_stream():
         try:
@@ -229,7 +285,7 @@ SUGGESTIONS_CONTEXT_CHARS = 1200
 
 
 @app.post("/suggestions", response_model=SuggestionsResponse)
-def suggestions(req: SuggestionsRequest):
+def suggestions(req: SuggestionsRequest, request: Request):
     """
     Cheap, fast follow-up suggestions using Groq directly — bypassing the
     full router, since this needs no classification, persona, or fallback
@@ -237,8 +293,12 @@ def suggestions(req: SuggestionsRequest):
     a message finishes streaming; never blocks or errors the main chat —
     any failure here just means no suggestion chips render.
     """
+    enforce_limits(request)
     groq = router.providers.get("groq")
     if groq is None:
+        return {"suggestions": []}
+    ok, _ = controls.budget.check("groq")
+    if not ok:  # suggestions are optional - never spend past a hard cap on them
         return {"suggestions": []}
 
     user_text = req.user_message[:SUGGESTIONS_CONTEXT_CHARS]
@@ -269,16 +329,19 @@ GROQ_TRANSCRIBE_ENDPOINT = "https://api.groq.com/openai/v1/audio/transcriptions"
 
 
 @app.post("/transcribe", response_model=TranscribeResponse)
-async def transcribe(audio: UploadFile = File(...)):
+async def transcribe(request: Request, audio: UploadFile = File(...)):
     """
     Server-side speech-to-text for browsers with no SpeechRecognition —
     see transcribeAudio in aiBackend.ts. Uses Groq's hosted Whisper
     endpoint since GROQ_API_KEY is already configured for chat.
     """
+    enforce_limits(request)
     if not API_KEYS["groq"]:
         raise HTTPException(status_code=503, detail="transcription not configured")
 
     audio_bytes = await audio.read()
+    if len(audio_bytes) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="audio file too large")
     files = {"file": (audio.filename or "recording.webm", audio_bytes, audio.content_type or "audio/webm")}
     data = {"model": "whisper-large-v3"}
     headers = {"Authorization": f"Bearer {API_KEYS['groq']}"}
@@ -859,3 +922,107 @@ def training_quiz(req: TrainingQuizRequest, user_id: str = Depends(require_train
     return _training_call(training_engine.generate_quiz, subject=req.subject, is_coding=req.is_coding,
                           language=req.language, level=req.level, stage=req.stage, course_title=req.course_title,
                           lesson=req.lesson.model_dump(), performance=req.performance)
+
+
+# =============================================================================
+# Admin operations (hosted-scale control plane). Every endpoint requires
+# role == 'admin' looked up fresh on every call (require_admin above).
+# Changes are written to the audit log; none of them can be reached from chat.
+# =============================================================================
+def _admin_audit(user_id: str, action: str, reason: str) -> None:
+    from datetime import datetime, timezone
+    audit_log.record(AuditEntry(datetime.now(timezone.utc), f"admin:{user_id}", action, True, reason, level=3))
+
+
+class KillSwitchRequest(BaseModel):
+    learning: bool | None = None
+    actions: bool | None = None
+    reason: str = Field(default="", max_length=300)
+
+
+@app.get("/admin/ops/status")
+def ops_status(user_id: str = Depends(require_admin)):
+    """One call for the whole dashboard: alerts, kill switch, budget, provider
+    circuits, metrics, rate limits, learned-model registry, pending approvals."""
+    return {
+        **controls.snapshot(),
+        "emotion_memory": emotion_engine.stats(),
+        "learned": learned.admin_info(),
+        "approvals_pending": approvals.list("pending"),
+    }
+
+
+@app.post("/admin/ops/killswitch")
+def ops_killswitch(req: KillSwitchRequest, user_id: str = Depends(require_admin)):
+    status = controls.killswitch.set(learning=req.learning, actions=req.actions, reason=req.reason, by=user_id)
+    _admin_audit(user_id, "kill_switch", f"learning={req.learning} actions={req.actions} reason={req.reason[:80]}")
+    return status
+
+
+@app.get("/admin/ops/decisions")
+def ops_decisions(limit: int = 50, user_id: str = Depends(require_admin)):
+    """Recent decision records: route, provider, latency, attempts. No message text."""
+    return {"decisions": controls.observability.recent(limit)}
+
+
+@app.get("/admin/ops/audit")
+def ops_audit(limit: int = 100, user_id: str = Depends(require_admin)):
+    entries = audit_log.entries[-max(1, min(limit, 500)):][::-1]
+    return {"entries": [{"ts": e.timestamp.isoformat(timespec="seconds"), "session": e.session_id,
+                         "action": e.action, "allowed": e.allowed, "reason": e.reason, "level": e.level}
+                        for e in entries]}
+
+
+@app.get("/admin/ops/approvals")
+def ops_approvals(status: str | None = None, user_id: str = Depends(require_admin)):
+    return {"approvals": approvals.list(status)}
+
+
+@app.post("/admin/ops/approvals/{ticket_id}/{decision}")
+def ops_decide(ticket_id: str, decision: str, user_id: str = Depends(require_admin)):
+    if decision not in ("approve", "reject"):
+        raise HTTPException(status_code=400, detail="decision must be 'approve' or 'reject'")
+    ticket = approvals.decide(ticket_id, decision == "approve", by=user_id)
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="no pending ticket with that id")
+    _admin_audit(user_id, f"approval_{decision}", f"ticket {ticket_id} for {ticket['action']}")
+    return ticket
+
+
+@app.post("/admin/ops/learned/sleep")
+def ops_sleep(user_id: str = Depends(require_admin)):
+    """Run one sleep/consolidation cycle now: train a candidate, run the gate, promote or discard."""
+    result = learned.sleep_cycle(by=f"admin:{user_id}")
+    _admin_audit(user_id, "sleep_cycle", str(result.get("gate") or result.get("reason")))
+    return result
+
+
+@app.post("/admin/ops/learned/rollback")
+def ops_rollback(user_id: str = Depends(require_admin)):
+    meta = learned.rollback(by=user_id)
+    if meta is None:
+        raise HTTPException(status_code=409, detail="there is no previous version to roll back to")
+    _admin_audit(user_id, "model_rollback", "rolled back the learned model")
+    return learned.admin_info()
+
+
+@app.post("/admin/ops/learned/unpin")
+def ops_unpin(user_id: str = Depends(require_admin)):
+    learned.unpin(by=user_id)
+    _admin_audit(user_id, "model_unpin", "unpinned the learned model")
+    return learned.admin_info()
+
+
+@app.get("/admin/ops/provenance")
+def ops_provenance(user_id: str = Depends(require_admin)):
+    return learned_provenance.register()
+
+
+@app.get("/admin/ops/capacity")
+def ops_capacity(params: float, tokens: float | None = None, gpus: int = 1, user_id: str = Depends(require_admin)):
+    """Size a language-model training run before spending (document, Section 5)."""
+    if not (1e6 <= params <= 1e13):
+        raise HTTPException(status_code=400, detail="params must be between 1e6 and 1e13")
+    if gpus < 1 or gpus > 100_000:
+        raise HTTPException(status_code=400, detail="gpus must be between 1 and 100000")
+    return {"plan": capacity_planner.plan_language_model(params, tokens, gpus), "ladder": capacity_planner.LADDER}

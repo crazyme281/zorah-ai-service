@@ -20,6 +20,7 @@ import { TrainingCoursePage } from "./pages/TrainingCoursePage";
 import { UpgradePage } from "./pages/UpgradePage";
 import { AdminApkPage } from "./pages/AdminApkPage";
 import { AdminDashboardPage } from "./pages/AdminDashboardPage";
+import { AdminOpsPage } from "./pages/AdminOpsPage";
 import { ApkPopups } from "./components/ApkPopups";
 
 /** Minimum time the splash stays up, so the brand doesn't flash past. */
@@ -140,6 +141,7 @@ export default function App() {
                 <IonRouterOutlet id="main-content">
                   <Route exact path="/admin" component={AdminDashboardPage} />
                   <Route exact path="/admin/apk" component={AdminApkPage} />
+                  <Route exact path="/admin/ops" component={AdminOpsPage} />
                   <Route render={() => <Redirect to="/admin" />} />
                 </IonRouterOutlet>
               </div>

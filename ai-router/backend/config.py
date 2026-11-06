@@ -114,3 +114,63 @@ RAG_ROUTE = {
 # Per-call timeout in seconds. A provider that hangs past this is treated
 # as failed and the router moves to the next fallback.
 REQUEST_TIMEOUT = 60
+
+
+# ---------------------------------------------------------------------------
+# Hosted-scale operations (see control/, safety/autonomy.py, learned/registry.py)
+#
+# Everything here is read once at boot from environment variables so the
+# limits can be changed in the Render dashboard without a code change.
+# A value of 0 means "off / unlimited" unless stated otherwise.
+# ---------------------------------------------------------------------------
+def _int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+# Where small operational state lives (kill switch, budget counters, audit
+# log, decision records, approval queue). On Render, point this at a
+# persistent disk (e.g. /var/data) or it is wiped on every deploy.
+DATA_DIR = os.getenv("OPS_DATA_DIR") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+
+# Abuse and overload: sliding-window request limits on the public chat API.
+RATE_LIMIT_IP_PER_MIN = _int("RATE_LIMIT_IP_PER_MIN", 60)
+RATE_LIMIT_SESSION_PER_MIN = _int("RATE_LIMIT_SESSION_PER_MIN", 20)
+MAX_CHAT_MESSAGES = _int("MAX_CHAT_MESSAGES", 200)
+MAX_CHAT_TEXT_CHARS = _int("MAX_CHAT_TEXT_CHARS", 120_000)  # text only; image data is not counted
+
+# Runaway spending: hard daily caps. Calls are counted per provider; dollars
+# need the per-million-token prices below (PRICE_<PROVIDER>_IN_PER_M and
+# PRICE_<PROVIDER>_OUT_PER_M, e.g. PRICE_CLAUDE_IN_PER_M=1.0) - prices are
+# never guessed, so with no prices set only the call caps can bite.
+BUDGET_DAILY_CALLS_PER_PROVIDER = _int("BUDGET_DAILY_CALLS_PER_PROVIDER", 0)
+BUDGET_DAILY_USD = _float("BUDGET_DAILY_USD", 0.0)
+BUDGET_ALERT_FRACTION = _float("BUDGET_ALERT_FRACTION", 0.8)
+
+# Resilience: a provider failing this many times in a row is skipped for the
+# cool-down, then probed with a single request.
+BREAKER_FAILURES = _int("BREAKER_FAILURES", 5)
+BREAKER_COOLDOWN_S = _int("BREAKER_COOLDOWN_S", 30)
+
+# Autonomy: highest level an action may have and still run (3 = needs a
+# human-approved ticket, 4 = never). Lower it to 2 to forbid external effects.
+AUTONOMY_MAX_LEVEL = _int("AUTONOMY_MAX_LEVEL", 3)
+APPROVAL_TTL_S = _int("APPROVAL_TTL_S", 24 * 3600)
+
+# Memory: emotional working-memory is per session and lives in RAM, so it is
+# bounded to keep an always-on service from growing without limit.
+EMOTION_MAX_SESSIONS = _int("EMOTION_MAX_SESSIONS", 5000)
+EMOTION_SESSION_TTL_S = _int("EMOTION_SESSION_TTL_S", 6 * 3600)
+
+# Sleep / consolidation of the learned model: 0 = only when an admin runs it
+# (or when enough chat questions are queued).
+SLEEP_INTERVAL_S = _int("SLEEP_INTERVAL_S", 0)

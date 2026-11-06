@@ -13,7 +13,7 @@
 import { useEffect, useState } from "react";
 import { IonPage, IonContent, IonIcon } from "@ionic/react";
 import { useIonRouter } from "@ionic/react";
-import { shieldCheckmarkOutline, cubeOutline, chevronForwardOutline } from "ionicons/icons";
+import { shieldCheckmarkOutline, cubeOutline, chevronForwardOutline, pulseOutline } from "ionicons/icons";
 import { TopBar } from "../components/TopBar";
 import { useAuth } from "../hooks/useAuth";
 import { supabase } from "../lib/supabase";
@@ -37,6 +37,7 @@ export function AdminDashboardPage() {
   const router = useIonRouter();
   const { user } = useAuth();
   const [release, setRelease] = useState<AdminApkRelease | null>(null);
+  const [opsSummary, setOpsSummary] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -51,6 +52,28 @@ export function AdminDashboardPage() {
         setRelease(body.exists ? body.release : null);
       } catch {
         // The APK card below just falls back to "no release yet" wording.
+      }
+    })();
+  }, []);
+
+  // One-line health summary for the Operations card (alerts + request count).
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        const resp = await fetch(`${BASE}/admin/ops/status`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!resp.ok) return;
+        const body = await resp.json();
+        const alerts = (body.alerts ?? []).length;
+        const total = body.metrics?.totals?.requests ?? 0;
+        setOpsSummary(
+          `${alerts === 0 ? "All clear" : `${alerts} alert${alerts === 1 ? "" : "s"}`} · ${total} request${total === 1 ? "" : "s"} since start`,
+        );
+      } catch {
+        // The card falls back to its generic description.
       }
     })();
   }, []);
@@ -83,6 +106,22 @@ export function AdminDashboardPage() {
                         release.file_size,
                       )}, uploaded ${new Date(release.uploaded_at).toLocaleDateString()}`
                     : "No APK uploaded yet — upload one to make it available to users"}
+                </span>
+              </div>
+              <IonIcon icon={chevronForwardOutline} className="admin-dash__card-chevron" />
+            </button>
+
+            <button
+              type="button"
+              className="admin-dash__card"
+              onClick={() => router.push("/admin/ops", "none", "push")}
+            >
+              <IonIcon icon={pulseOutline} className="admin-dash__card-icon" />
+              <div className="admin-dash__card-body">
+                <b>Operations</b>
+                <span>
+                  {opsSummary ??
+                    "Kill switch, budget caps, provider health, learned-model versions and approvals"}
                 </span>
               </div>
               <IonIcon icon={chevronForwardOutline} className="admin-dash__card-chevron" />

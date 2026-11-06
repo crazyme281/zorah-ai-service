@@ -33,3 +33,46 @@ services:
       # Comma-separated frontend origin(s) allowed to call this API.
       - key: ALLOWED_ORIGINS
         value: "*"
+
+      # ── Hosted-scale controls (all optional; 0 = off / unlimited) ──────────
+      # Where kill switch, budget counters, audit log and decision records are
+      # kept. Mount a persistent disk (a paid plan) and point this at it, or
+      # this state is lost on every deploy. Left unset, it is kept in
+      # backend/data (fine for a single free instance, wiped on redeploy).
+      # - key: OPS_DATA_DIR
+      #   value: /var/data
+      # Abuse and overload: sliding-window limits per minute.
+      - key: RATE_LIMIT_IP_PER_MIN
+        value: "60"
+      - key: RATE_LIMIT_SESSION_PER_MIN
+        value: "20"
+      # Runaway spending: hard daily caps. Dollar caps need the per-million-
+      # token prices of the models you use (PRICE_<PROVIDER>_IN_PER_M and
+      # PRICE_<PROVIDER>_OUT_PER_M); call caps work without them.
+      - key: BUDGET_DAILY_CALLS_PER_PROVIDER
+        value: "0"
+      - key: BUDGET_DAILY_USD
+        value: "0"
+      # Resilience: skip a provider after N failures in a row, for N seconds.
+      - key: BREAKER_FAILURES
+        value: "5"
+      - key: BREAKER_COOLDOWN_S
+        value: "30"
+      # Autonomy ceiling: 3 = high-impact actions need a human-approved ticket,
+      # 2 = no external effects at all.
+      - key: AUTONOMY_MAX_LEVEL
+        value: "3"
+      # Learned model: sleep/consolidation every N seconds (0 = admin-triggered
+      # only; a free instance is spun down when idle, so use it on an always-on
+      # plan). LEARN_AI_DATA_POLICY: allow | quarantine | exclude - what to do
+      # with answers written by other AI models.
+      - key: SLEEP_INTERVAL_S
+        value: "0"
+      - key: LEARN_AI_DATA_POLICY
+        value: allow
+      # Emergency switches. Set to 1 to force autonomous learning / actions off
+      # without a deploy (the admin API cannot turn a forced switch back on).
+      - key: KILL_SWITCH_LEARNING
+        value: "0"
+      - key: KILL_SWITCH_ACTIONS
+        value: "0"

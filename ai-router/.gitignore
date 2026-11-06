@@ -12,3 +12,9 @@ dist/
 # Users' chat questions learned by the AI must never be committed
 backend/learned/artifacts/chat_learned.json
 backend/learned/artifacts/*.tmp
+
+# Operational state of the hosted service (kill switch, budget counters,
+# audit log, decision records, approval queue) and learned-model registry
+backend/data/
+backend/learned/artifacts/registry/
+backend/learned/artifacts/*.candidate

@@ -16,6 +16,7 @@ Safeguards (all tested):
 Switch off with LEARN_FROM_CHAT=0.
 """
 import hashlib, json, os, re, threading, time, uuid
+from collections import Counter
 from .text import features
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -24,6 +25,11 @@ ENABLED = os.getenv("LEARN_FROM_CHAT", "1") != "0"
 MIN_ASKS = int(os.getenv("LEARN_MIN_ASKS", "2"))
 RETRAIN_INTERVAL_S = int(os.getenv("LEARN_RETRAIN_INTERVAL_S", "600"))
 SAME_QUESTION = 0.6      # unigram Jaccard for "this is the same question"
+# Independence policy for text written by other AI models (all of it is):
+#   allow      - learn from it (default, the behaviour the app shipped with)
+#   quarantine - keep it on record but never train on it
+#   exclude    - never store it
+AI_DATA_POLICY = os.getenv("LEARN_AI_DATA_POLICY", "allow").strip().lower()
 MAX_ENTRIES = 500
 MAX_QUESTIONS = 8
 
@@ -36,6 +42,24 @@ _SELF = re.compile(r"\b(my|mine|myself|our|ours)\b|\bi\s*(am|have|had|got)\b|\bi
 _SENSITIVE = re.compile(r"password|passcode|\botp\b|\bpin\b|account number|card|\bssn\b|\bbvn\b|\bnin\b|salary|address|diagnos|prescri|symptom", re.I)
 _PII = re.compile(r"@|https?://|www\.|\d{5,}|\+\d")
 _BAD_ANSWER = re.compile(r"as an ai|i don'?t know|i'?m not sure|i cannot|i can'?t|sorry|apolog|as of my|knowledge cutoff|you seem|you'?re feeling|i feel|real-?time|browse|search the web", re.I)
+
+
+def _learning_allowed() -> bool:
+    """False while the operator's kill switch has autonomous learning off."""
+    try:
+        from control import get_controls
+        return get_controls().killswitch.learning_allowed()
+    except Exception:
+        return True
+
+
+def provenance_counts() -> dict:
+    """Counts only (never questions or answers), for the provenance register."""
+    with _lock:
+        entries = _load()["entries"]
+    return {"total": len(entries),
+            "by_status": dict(Counter(e["status"] for e in entries)),
+            "by_provider": dict(Counter(e.get("provider", "unknown") for e in entries))}
 
 
 def is_learnable_question(q: str) -> bool:
@@ -82,7 +106,9 @@ def _save(data: dict) -> None:
 
 def record(question: str, answer: str, provider: str, session_id=None) -> str:
     """Remember a provider answer. Returns 'skipped', 'recorded' or 'ready'."""
-    if not ENABLED or not is_learnable_question(question) or not is_learnable_answer(answer):
+    if not ENABLED or AI_DATA_POLICY == "exclude" or not _learning_allowed():
+        return "skipped"
+    if not is_learnable_question(question) or not is_learnable_answer(answer):
         return "skipped"
     sig, sh = _sig(question), _session_hash(session_id)
     with _lock:
@@ -94,7 +120,8 @@ def record(question: str, answer: str, provider: str, session_id=None) -> str:
             if len(entries) >= MAX_ENTRIES:
                 return "skipped"
             match = {"id": "chat_" + uuid.uuid4().hex[:8], "questions": [question.strip()], "answer": answer.strip(),
-                     "provider": provider, "sessions": [], "status": "pending", "first_seen": now}
+                     "provider": provider, "source": "provider_generated", "sessions": [],
+                     "status": "pending", "first_seen": now}
             entries.append(match)
         elif question.strip().lower() not in (x.lower() for x in match["questions"]) and len(match["questions"]) < MAX_QUESTIONS:
             match["questions"].append(question.strip())
@@ -110,6 +137,8 @@ def record(question: str, answer: str, provider: str, session_id=None) -> str:
 
 def entries_for_training() -> list[dict]:
     """Entries asked in enough sessions; never rejected ones."""
+    if AI_DATA_POLICY in ("quarantine", "exclude") or not _learning_allowed():
+        return []
     with _lock:
         return [e for e in _load()["entries"]
                 if e["status"] in ("queued", "active") and len(e["sessions"]) >= MIN_ASKS]
@@ -133,4 +162,4 @@ def summary() -> dict:
         c = {"pending": 0, "queued": 0, "active": 0, "rejected": 0}
         for e in _load()["entries"]:
             c[e["status"]] = c.get(e["status"], 0) + 1
-        return {"enabled": ENABLED, "min_asks": MIN_ASKS, **c}
+        return {"enabled": ENABLED, "min_asks": MIN_ASKS, "ai_data_policy": AI_DATA_POLICY, **c}
