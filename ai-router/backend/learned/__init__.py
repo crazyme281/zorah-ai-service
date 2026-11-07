@@ -54,7 +54,12 @@ def _load():
         if os.path.exists(ARTIFACT):
             try:
                 blob = json.load(open(ARTIFACT))
-                if blob["meta"].get("content_hash") == content_hash():
+                # After a redeploy the artifact is the one shipped in git; if
+                # the store holds more chat knowledge than it was trained
+                # with, retrain so nothing learned is lost.
+                known = blob["meta"].get("chat_learning", {}).get("used", 0)
+                if (blob["meta"].get("content_hash") == content_hash()
+                        and len(chat_learning.entries_for_training()) <= known):
                     _state["model"], meta = LearnedModel.from_dict(blob["model"]), blob["meta"]
             except Exception:  # corrupt artifact -> retrain below
                 logger.warning("learned artifact unreadable; retraining", exc_info=True)

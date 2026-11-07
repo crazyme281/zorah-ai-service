@@ -76,3 +76,10 @@ services:
         value: "0"
       - key: KILL_SWITCH_ACTIONS
         value: "0"
+      # Learned model: a vetted answer is kept after the first time it is
+      # asked, saved in Supabase (table learned_chat_entries) so it survives
+      # redeploys. Retrains are at most this many seconds apart.
+      - key: LEARN_MIN_ASKS
+        value: "1"
+      - key: LEARN_RETRAIN_INTERVAL_S
+        value: "60"

@@ -18,12 +18,13 @@ Switch off with LEARN_FROM_CHAT=0.
 import hashlib, json, os, re, threading, time, uuid
 from collections import Counter
 from .text import features
+from . import supabase_store as remote
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STORE_PATH = os.getenv("LEARNED_CHAT_STORE", os.path.join(HERE, "artifacts", "chat_learned.json"))
 ENABLED = os.getenv("LEARN_FROM_CHAT", "1") != "0"
-MIN_ASKS = int(os.getenv("LEARN_MIN_ASKS", "2"))
-RETRAIN_INTERVAL_S = int(os.getenv("LEARN_RETRAIN_INTERVAL_S", "600"))
+MIN_ASKS = int(os.getenv("LEARN_MIN_ASKS", "1"))   # vetted answers are kept after the first ask
+RETRAIN_INTERVAL_S = int(os.getenv("LEARN_RETRAIN_INTERVAL_S", "60"))
 SAME_QUESTION = 0.6      # unigram Jaccard for "this is the same question"
 # Independence policy for text written by other AI models (all of it is):
 #   allow      - learn from it (default, the behaviour the app shipped with)
@@ -88,7 +89,10 @@ def _session_hash(session_id) -> str:
     return hashlib.sha256(str(session_id or uuid.uuid4()).encode()).hexdigest()[:10]
 
 
-def _load() -> dict:
+_remote = {"pusher": remote.Pusher(), "cache": None, "path": None}
+
+
+def _read_file() -> dict:
     try:
         with open(STORE_PATH, encoding="utf-8") as f:
             return json.load(f)
@@ -96,12 +100,42 @@ def _load() -> dict:
         return {"entries": []}
 
 
+def _write_file(data: dict) -> None:
+    try:
+        os.makedirs(os.path.dirname(STORE_PATH), exist_ok=True)
+        tmp = STORE_PATH + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+        os.replace(tmp, STORE_PATH)  # atomic
+    except OSError:
+        pass  # the Supabase copy (or the in-memory one) is still good
+
+
+def _load() -> dict:
+    """Entries live in Supabase when it is configured (read once, then served
+    from memory); otherwise in the local JSON file."""
+    if not remote.enabled():
+        return _read_file()
+    if _remote["cache"] is not None and _remote["path"] == STORE_PATH:
+        return _remote["cache"]
+    local = _read_file()
+    stored = remote.fetch_all()
+    if stored is None:  # Supabase unreachable: keep working from the file, try again next time
+        return local
+    merged = {e["id"]: e for e in local["entries"]}
+    merged.update({e["id"]: e for e in stored})   # Supabase wins
+    data = {"entries": list(merged.values())}
+    _remote["pusher"].mark_remote(stored)
+    _remote["cache"], _remote["path"] = data, STORE_PATH
+    _remote["pusher"].push(data["entries"])       # first run: upload what only the file had
+    return data
+
+
 def _save(data: dict) -> None:
-    os.makedirs(os.path.dirname(STORE_PATH), exist_ok=True)
-    tmp = STORE_PATH + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
-    os.replace(tmp, STORE_PATH)  # atomic
+    _write_file(data)
+    if remote.enabled():
+        _remote["cache"], _remote["path"] = data, STORE_PATH
+        _remote["pusher"].push(data["entries"])
 
 
 def record(question: str, answer: str, provider: str, session_id=None) -> str:
@@ -162,4 +196,5 @@ def summary() -> dict:
         c = {"pending": 0, "queued": 0, "active": 0, "rejected": 0}
         for e in _load()["entries"]:
             c[e["status"]] = c.get(e["status"], 0) + 1
-        return {"enabled": ENABLED, "min_asks": MIN_ASKS, "ai_data_policy": AI_DATA_POLICY, **c}
+        return {"enabled": ENABLED, "min_asks": MIN_ASKS, "ai_data_policy": AI_DATA_POLICY,
+                "storage": "supabase" if remote.enabled() else "file", **c}

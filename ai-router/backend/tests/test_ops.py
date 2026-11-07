@@ -85,7 +85,7 @@ def test_killswitch_stops_chat_learning(tmp_path, monkeypatch):
     control.set_controls(c)
     try:
         q, a = "what is the capital of France", "Paris is the capital and largest city of France, on the Seine."
-        assert cl.record(q, a, "claude", "s1") == "recorded"
+        assert cl.record(q, a, "claude", "s1") in ("recorded", "ready")
         c.killswitch.set(learning=False)
         assert cl.record(q, a, "claude", "s2") == "skipped"
         assert cl.entries_for_training() == []
