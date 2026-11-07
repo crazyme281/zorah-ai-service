@@ -113,17 +113,29 @@ def test_chat_entries_need_extra_confidence():
     assert ask(router, "what is the capital of France", "c")["provider"] != "learned"
 
 
-def test_not_recorded_for_followups_images_or_when_disabled(monkeypatch):
+def test_standalone_question_is_learned_from_any_point_in_a_chat(monkeypatch):
     router, _ = make_router()
-    two_turns = [{"role": "user", "content": "hi there"}, {"role": "assistant", "content": "hello"},
-                 {"role": "user", "content": "what is the capital of France"}]
-    router.chat(two_turns, session_id="x")
-    img = [{"role": "user", "content": [{"type": "text", "text": "what is the capital of France"},
+    later = [{"role": "user", "content": "hi there"}, {"role": "assistant", "content": "hello"},
+             {"role": "user", "content": "what is the capital of France"}]
+    router.chat(later, session_id="x")
+    entries = json.load(open(cl.STORE_PATH))["entries"]
+    assert [e["questions"][0] for e in entries] == ["what is the capital of France"]
+
+
+def test_not_recorded_for_context_dependent_followups_images_or_when_disabled(monkeypatch):
+    router, _ = make_router()
+    follow = [{"role": "user", "content": "what is the capital of France"}, {"role": "assistant", "content": "Paris is the capital."},
+              {"role": "user", "content": "why is that the capital?"}]
+    router.chat(follow, session_id="x")
+    assert "why is that the capital?" not in [q for e in cl._load()["entries"] for q in e["questions"]]
+    assert cl.summary()["last_attempt"]["note"].startswith("skipped: depends on earlier messages")
+    img = [{"role": "user", "content": [{"type": "text", "text": "what is the capital of Spain"},
                                         {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}}]}]
     router.chat(img, session_id="y")
     monkeypatch.setattr(cl, "ENABLED", False)
-    ask(router, "what is the capital of France", "z")
-    assert not json.load(open(cl.STORE_PATH))["entries"] if __import__("os").path.exists(cl.STORE_PATH) else True
+    ask(router, "what is the capital of Italy", "z")
+    questions = [q for e in cl._load()["entries"] for q in e["questions"]]
+    assert "what is the capital of Spain" not in questions and "what is the capital of Italy" not in questions
 
 
 def test_summary_never_exposes_questions():

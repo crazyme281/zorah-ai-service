@@ -296,8 +296,9 @@ class AIRouter:
 
         # Remember vetted standalone Q&A so the learned model can answer
         # it next time (never raises; see learned/chat_learning.py).
-        if (not image_present and isinstance(reply, str)
-                and sum(1 for m in messages if m.get("role") == "user") == 1):
+        # The newest message is what gets learned, from any point in a chat;
+        # chat_learning rejects questions that lean on earlier turns.
+        if not image_present and isinstance(reply, str):
             learned.record_fallback(user_text, reply, answered_by, session_id)
         record(answered_by, True, attempts, out_chars=len(reply) if isinstance(reply, str) else 0)
         return {

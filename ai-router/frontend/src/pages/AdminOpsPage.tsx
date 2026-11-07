@@ -53,7 +53,10 @@ interface HistoryItem {
 interface Learned {
   registry: { current: string | null; previous: string | null; pinned: boolean; history: HistoryItem[] };
   last_gate: { promoted: boolean; ok: boolean | null; reasons: string[]; at: number } | null;
-  chat_learning: { enabled: boolean; ai_data_policy: string; pending: number; queued: number; active: number; rejected: number };
+  chat_learning: {
+    enabled: boolean; ai_data_policy: string; storage: string; pending: number; queued: number; active: number; rejected: number;
+    last_attempt: { note: string; at: number };
+  };
 }
 interface Approval { id: string; session_id: string; action: string; summary: string; requested_at: number }
 interface Decision {
@@ -309,6 +312,16 @@ export function AdminOpsPage() {
                     <span>Learning from chat<small>Policy for text written by other AI models: {status.learned.chat_learning.ai_data_policy}</small></span>
                     <span className="ops__muted">
                       {status.learned.chat_learning.active} active · {status.learned.chat_learning.queued} queued · {status.learned.chat_learning.pending} pending
+                    </span>
+                  </div>
+                  <div className="ops__row">
+                    <span>Last learning attempt
+                      <small>Saved in: {status.learned.chat_learning.storage === "supabase" ? "Supabase" : "local file only"}</small>
+                    </span>
+                    <span className="ops__muted">
+                      {status.learned.chat_learning.last_attempt.at
+                        ? `${status.learned.chat_learning.last_attempt.note} (${ago(status.learned.chat_learning.last_attempt.at)})`
+                        : "no chat question yet"}
                     </span>
                   </div>
                   <div className="ops__actions">

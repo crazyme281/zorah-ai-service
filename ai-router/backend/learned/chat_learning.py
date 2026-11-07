@@ -42,7 +42,17 @@ _TIME = re.compile(r"\b(today|tonight|now|current|currently|latest|recent|recent
 _SELF = re.compile(r"\b(my|mine|myself|our|ours)\b|\bi\s*(am|have|had|got)\b|\bi'?m\b|\bi'?ve\b", re.I)
 _SENSITIVE = re.compile(r"password|passcode|\botp\b|\bpin\b|account number|card|\bssn\b|\bbvn\b|\bnin\b|salary|address|diagnos|prescri|symptom", re.I)
 _PII = re.compile(r"@|https?://|www\.|\d{5,}|\+\d")
+_CONTEXT = re.compile(r"\b(it|its|this|that|these|those|they|them|their|he|she|his|her|him|above|previous|earlier|again|the same|more about)\b", re.I)
 _BAD_ANSWER = re.compile(r"as an ai|i don'?t know|i'?m not sure|i cannot|i can'?t|sorry|apolog|as of my|knowledge cutoff|you seem|you'?re feeling|i feel|real-?time|browse|search the web", re.I)
+
+
+_last = {"note": "nothing yet", "at": 0}
+
+
+def _note(text: str) -> None:
+    """Remember the outcome of the latest attempt (no question text) so an
+    admin can see why a question was or was not learned."""
+    _last["note"], _last["at"] = text, int(time.time())
 
 
 def _learning_allowed() -> bool:
@@ -63,18 +73,41 @@ def provenance_counts() -> dict:
             "by_provider": dict(Counter(e.get("provider", "unknown") for e in entries))}
 
 
-def is_learnable_question(q: str) -> bool:
+def question_problem(q: str) -> str | None:
+    """Why a question can't be learned, or None if it can."""
     q = (q or "").strip()
     if not (6 <= len(q) <= 150) or "\n" in q or "```" in q:
-        return False
+        return "question is too short, too long or has code"
     if not (_Q_START.match(q) or q.endswith("?")):
-        return False
-    return not (_TASK.search(q) or _TIME.search(q) or _SELF.search(q) or _SENSITIVE.search(q) or _PII.search(q))
+        return "not phrased as a question"
+    if _TASK.search(q):
+        return "asks for a task (write, fix, build...), not a fact"
+    if _TIME.search(q):
+        return "time-sensitive (today, latest, price...)"
+    if _SELF.search(q) or _SENSITIVE.search(q) or _PII.search(q):
+        return "personal or sensitive wording"
+    if _CONTEXT.search(q):
+        return "depends on earlier messages (it, this, that...)"
+    return None
+
+
+def answer_problem(a: str) -> str | None:
+    a = (a or "").strip()
+    if not (30 <= len(a) <= 1500):
+        return "provider answer is too short or too long"
+    if "```" in a or _PII.search(a):
+        return "answer has code, a link or personal data"
+    if _BAD_ANSWER.search(a):
+        return "answer hedges or apologises"
+    return None
+
+
+def is_learnable_question(q: str) -> bool:
+    return question_problem(q) is None
 
 
 def is_learnable_answer(a: str) -> bool:
-    a = (a or "").strip()
-    return 30 <= len(a) <= 1500 and "```" not in a and not _PII.search(a) and not _BAD_ANSWER.search(a)
+    return answer_problem(a) is None
 
 
 def _sig(q: str) -> frozenset:
@@ -141,8 +174,11 @@ def _save(data: dict) -> None:
 def record(question: str, answer: str, provider: str, session_id=None) -> str:
     """Remember a provider answer. Returns 'skipped', 'recorded' or 'ready'."""
     if not ENABLED or AI_DATA_POLICY == "exclude" or not _learning_allowed():
+        _note("skipped: learning is switched off")
         return "skipped"
-    if not is_learnable_question(question) or not is_learnable_answer(answer):
+    problem = question_problem(question) or answer_problem(answer)
+    if problem:
+        _note(f"skipped: {problem}")
         return "skipped"
     sig, sh = _sig(question), _session_hash(session_id)
     with _lock:
@@ -166,6 +202,7 @@ def record(question: str, answer: str, provider: str, session_id=None) -> str:
         if ready:
             match["status"] = "queued"
         _save(data)
+        _note("saved: queued for training" if ready else "saved: already known, waiting")
         return "ready" if ready else "recorded"
 
 
@@ -197,4 +234,5 @@ def summary() -> dict:
         for e in _load()["entries"]:
             c[e["status"]] = c.get(e["status"], 0) + 1
         return {"enabled": ENABLED, "min_asks": MIN_ASKS, "ai_data_policy": AI_DATA_POLICY,
-                "storage": "supabase" if remote.enabled() else "file", **c}
+                "storage": "supabase" if remote.enabled() else "file",
+                "last_attempt": dict(_last), **c}
