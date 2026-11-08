@@ -15,7 +15,7 @@ class R:
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     (tmp_path / "main.py").write_text("print(1)")
-    monkeypatch.setattr(cp, "WORKER_URL", "http://worker")
+    monkeypatch.setattr(cp, "WORKER_URL", "https://worker.example")
     monkeypatch.setattr(cp, "WORKER_SHARED_SECRET", "s")
     sleeps = []
     monkeypatch.setattr(cp.time, "sleep", lambda s: sleeps.append(s))
@@ -47,7 +47,7 @@ def test_gives_up_with_a_clear_message(env, monkeypatch):
     root, _ = env
     monkeypatch.setattr(cp.requests, "get", lambda url, **kw: R(200))
     monkeypatch.setattr(cp.requests, "post", lambda url, **kw: R(429))
-    with pytest.raises(cp.PipelineError, match="HTTP 429 .*after 5 tries"):
+    with pytest.raises(cp.PipelineError, match="worker.example returned HTTP 429 .*after 5 tries"):
         cp.call_worker(root, ["x"])
 
 
@@ -75,3 +75,16 @@ def test_unreachable_worker_is_retried(env, monkeypatch):
         return v
     monkeypatch.setattr(cp.requests, "post", post)
     assert cp.call_worker(root, ["x"]) == OK["results"]
+
+
+@pytest.mark.parametrize("raw,expected", [
+    ("https://zorah-code-fixer-worker.onrender.com", "https://zorah-code-fixer-worker.onrender.com"),
+    ("  https://zorah-code-fixer-worker.onrender.com/  ", "https://zorah-code-fixer-worker.onrender.com"),
+    ("zorah-code-fixer-worker.onrender.com", "https://zorah-code-fixer-worker.onrender.com"),
+    ("https://zorah-code-fixer-worker.onrender.com/run", "https://zorah-code-fixer-worker.onrender.com"),
+    ('"https://w.onrender.com/health/"', "https://w.onrender.com"),
+    ("", None), (None, None),
+])
+def test_worker_url_typos_are_forgiven(raw, expected):
+    from config import _clean_worker_url
+    assert _clean_worker_url(raw) == expected

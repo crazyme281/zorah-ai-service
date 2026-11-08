@@ -349,6 +349,11 @@ WORKER_MAX_ATTEMPTS = 5
 WORKER_MAX_BACKOFF_S = 60
 
 
+def _worker_host() -> str:
+    from urllib.parse import urlparse
+    return urlparse(WORKER_URL or "").netloc or "(not set)"
+
+
 def _wake_worker() -> None:
     """Free-tier hosts put idle services to sleep; while one boots, its proxy
     answers 429/502/503 to everything. Ping /health until it answers, so the
@@ -394,21 +399,21 @@ def call_worker(root: Path, commands: list[str]) -> list[dict]:
                 timeout=WORKER_TIMEOUT,
             )
         except requests.RequestException as e:
-            last = f"couldn't reach the worker ({e})"
+            last = f"couldn't reach the worker at {_worker_host()} ({type(e).__name__})"
         else:
             if resp.status_code == 200:
                 return resp.json()["results"]
             if resp.status_code == 401:
                 raise PipelineError("the worker rejected the shared secret - WORKER_SHARED_SECRET must be identical on both services")
             if resp.status_code not in WORKER_RETRY_STATUSES:
-                raise PipelineError(f"worker returned HTTP {resp.status_code}: {resp.text[:300]}")
-            last = f"worker returned HTTP {resp.status_code} (busy or still starting)"
+                raise PipelineError(f"the worker at {_worker_host()} returned HTTP {resp.status_code}: {resp.text[:300]}")
+            last = f"the worker at {_worker_host()} returned HTTP {resp.status_code} (busy or still starting)"
             delay = _retry_after(resp, delay)
         if attempt < WORKER_MAX_ATTEMPTS:
             time.sleep(delay)
             delay = min(delay * 2, WORKER_MAX_BACKOFF_S)
 
-    raise PipelineError(f"{last} after {WORKER_MAX_ATTEMPTS} tries - check that the worker service is running on Render, then try again")
+    raise PipelineError(f"{last} after {WORKER_MAX_ATTEMPTS} tries - if that host is not your Code Fixer worker, fix CODE_FIXER_WORKER_URL; otherwise check the worker service on Render")
 
 
 def _validation_passed(results: list[dict]) -> bool:

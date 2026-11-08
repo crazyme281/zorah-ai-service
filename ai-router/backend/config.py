@@ -69,7 +69,22 @@ MODELS = {
 # Code Fixer — the separate worker service that actually runs untrusted
 # `npm install`/`pytest`/etc. It holds no secrets of its own; the main
 # backend authenticates to it with this shared secret and nothing else.
-WORKER_URL = os.getenv("CODE_FIXER_WORKER_URL")
+def _clean_worker_url(raw: str | None) -> str | None:
+    """Forgive the usual typos: spaces, a missing https://, a trailing slash,
+    or a pasted /run or /health on the end."""
+    url = (raw or "").strip().strip("\"'")
+    if not url:
+        return None
+    if not url.lower().startswith(("http://", "https://")):
+        url = "https://" + url
+    url = url.rstrip("/")
+    for suffix in ("/run", "/health"):
+        if url.lower().endswith(suffix):
+            url = url[: -len(suffix)].rstrip("/")
+    return url
+
+
+WORKER_URL = _clean_worker_url(os.getenv("CODE_FIXER_WORKER_URL"))
 WORKER_SHARED_SECRET = os.getenv("WORKER_SHARED_SECRET")
 
 MAX_UPLOAD_ZIP_BYTES = 60 * 1024 * 1024
