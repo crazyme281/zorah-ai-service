@@ -13,6 +13,7 @@ which holds none of this process's secrets.
 
 import io
 import json
+import time
 import zipfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -342,6 +343,36 @@ def zip_directory(root: Path) -> bytes:
 
 # -------------------------------------------------------------- worker --
 
+WORKER_WAKE_BUDGET_S = 120      # a sleeping free-tier worker needs up to a minute or two to boot
+WORKER_RETRY_STATUSES = {429, 502, 503, 504}
+WORKER_MAX_ATTEMPTS = 5
+WORKER_MAX_BACKOFF_S = 60
+
+
+def _wake_worker() -> None:
+    """Free-tier hosts put idle services to sleep; while one boots, its proxy
+    answers 429/502/503 to everything. Ping /health until it answers, so the
+    real request (a big upload) is not wasted on a worker that isn't up yet.
+    Never raises: if it never wakes, the request below reports the error."""
+    deadline = time.monotonic() + WORKER_WAKE_BUDGET_S
+    delay = 3.0
+    while time.monotonic() < deadline:
+        try:
+            if requests.get(f"{WORKER_URL}/health", timeout=15).status_code == 200:
+                return
+        except requests.RequestException:
+            pass
+        time.sleep(delay)
+        delay = min(delay * 1.5, 15)
+
+
+def _retry_after(resp, fallback: float) -> float:
+    try:
+        return min(max(float(resp.headers.get("Retry-After", fallback)), 1.0), WORKER_MAX_BACKOFF_S)
+    except (TypeError, ValueError):
+        return fallback
+
+
 def call_worker(root: Path, commands: list[str]) -> list[dict]:
     if not WORKER_URL or not WORKER_SHARED_SECRET:
         raise PipelineError("the Code Fixer worker isn't configured (CODE_FIXER_WORKER_URL/WORKER_SHARED_SECRET)")
@@ -349,16 +380,35 @@ def call_worker(root: Path, commands: list[str]) -> list[dict]:
         return []
 
     zip_bytes = zip_directory(root)
-    resp = requests.post(
-        f"{WORKER_URL}/run",
-        headers={"x-worker-secret": WORKER_SHARED_SECRET},
-        files={"project": ("project.zip", zip_bytes, "application/zip")},
-        data={"commands": "\n".join(commands)},
-        timeout=WORKER_TIMEOUT,
-    )
-    if resp.status_code != 200:
-        raise PipelineError(f"worker returned HTTP {resp.status_code}: {resp.text[:300]}")
-    return resp.json()["results"]
+    _wake_worker()
+
+    delay = 5.0
+    last = None
+    for attempt in range(1, WORKER_MAX_ATTEMPTS + 1):
+        try:
+            resp = requests.post(
+                f"{WORKER_URL}/run",
+                headers={"x-worker-secret": WORKER_SHARED_SECRET},
+                files={"project": ("project.zip", zip_bytes, "application/zip")},
+                data={"commands": "\n".join(commands)},
+                timeout=WORKER_TIMEOUT,
+            )
+        except requests.RequestException as e:
+            last = f"couldn't reach the worker ({e})"
+        else:
+            if resp.status_code == 200:
+                return resp.json()["results"]
+            if resp.status_code == 401:
+                raise PipelineError("the worker rejected the shared secret - WORKER_SHARED_SECRET must be identical on both services")
+            if resp.status_code not in WORKER_RETRY_STATUSES:
+                raise PipelineError(f"worker returned HTTP {resp.status_code}: {resp.text[:300]}")
+            last = f"worker returned HTTP {resp.status_code} (busy or still starting)"
+            delay = _retry_after(resp, delay)
+        if attempt < WORKER_MAX_ATTEMPTS:
+            time.sleep(delay)
+            delay = min(delay * 2, WORKER_MAX_BACKOFF_S)
+
+    raise PipelineError(f"{last} after {WORKER_MAX_ATTEMPTS} tries - check that the worker service is running on Render, then try again")
 
 
 def _validation_passed(results: list[dict]) -> bool:
