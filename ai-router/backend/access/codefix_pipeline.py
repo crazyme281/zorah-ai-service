@@ -42,6 +42,7 @@ IGNORE_DIRS = {
     "node_modules", ".git", "dist", "build", ".next", "__pycache__",
     ".venv", "venv", "target", ".gradle", ".dart_tool", "vendor",
     ".pytest_cache", ".mypy_cache", "coverage", ".idea", ".vscode",
+    "__MACOSX",  # junk a Mac adds to every zip it makes
 }
 
 # Extensions we'll actually read as text for AI context. Everything else
@@ -109,6 +110,45 @@ def _walk_relevant(root: Path):
 
 # -------------------------------------------------------------- detect --
 
+MAX_ROOT_SEARCH_DEPTH = 3
+SOURCE_EXTENSIONS = TEXT_EXTENSIONS - {".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".env.example", ".md", ".txt", ".xml"}
+
+
+def _subdirs(path: Path) -> list[Path]:
+    try:
+        return sorted(p for p in path.iterdir() if p.is_dir() and p.name not in IGNORE_DIRS)
+    except OSError:
+        return []
+
+
+def find_project_root(extracted: Path) -> Path:
+    """Where the project actually starts inside the extracted zip.
+
+    A zip made from a folder (right-click > Compress, or GitHub's "Download
+    ZIP") holds ONE wrapper folder - "my-app-main/..." - so the manifest is
+    a level or two down, not at the top. Returns the shallowest folder that
+    holds a manifest (package.json, requirements.txt, ...), searching up to
+    MAX_ROOT_SEARCH_DEPTH levels. With no manifest anywhere, it steps into a
+    lone wrapper folder so the file tree is clean; otherwise the top.
+    """
+    level = [extracted]
+    for _depth in range(MAX_ROOT_SEARCH_DEPTH + 1):
+        for folder in level:
+            if any((folder / m).is_file() for m in MANIFEST_FILES):
+                return folder
+        level = [d for folder in level for d in _subdirs(folder)]
+        if not level:
+            break
+
+    current = extracted
+    for _ in range(MAX_ROOT_SEARCH_DEPTH):
+        files = [p for p in current.iterdir() if p.is_file() and p.name != ".DS_Store"]
+        dirs = _subdirs(current)
+        if files or len(dirs) != 1:
+            break
+        current = dirs[0]
+    return current
+
 def detect_project(root: Path) -> tuple[str, list[str]]:
     """Returns (project_type, validation_commands). Commands for Node and
     Python are built from what's actually in the project (checking which
@@ -134,6 +174,14 @@ def detect_project(root: Path) -> tuple[str, list[str]]:
         return "rust", ["cargo build", "cargo test"]
     if "go.mod" in names:
         return "go", ["go build ./...", "go test ./..."]
+
+    # No manifest: still worth fixing. Plain Python gets a syntax check; any
+    # other source (JS, HTML, ...) gets one AI pass with nothing to run.
+    sources = [p for p in _walk_relevant(root) if p.suffix in SOURCE_EXTENSIONS]
+    if any(p.suffix in (".py", ".pyi") for p in sources):
+        return "python", ["python3 -m compileall -q ."]
+    if sources:
+        return "source-only", []
 
     return "unknown", []
 
@@ -392,6 +440,11 @@ def run_job(job_id: str, zip_bytes: bytes) -> None:
             safe_extract(zip_bytes, root)
 
             jobs.update_job(job_id, status="inspecting")
+            # The project may sit inside a wrapper folder in the zip; fix and
+            # validate it there, but package the WHOLE extraction at the end
+            # so the user gets their original folder layout back.
+            extracted_root = root
+            root = find_project_root(extracted_root)
             project_type, commands = detect_project(root)
             jobs.update_job(job_id, project_type=project_type)
 
@@ -399,9 +452,10 @@ def run_job(job_id: str, zip_bytes: bytes) -> None:
                 jobs.update_job(
                     job_id,
                     status="failed",
-                    error="Couldn't detect a supported project type (looked for package.json, "
-                    "requirements.txt/pyproject.toml, pom.xml, build.gradle, composer.json, "
-                    "pubspec.yaml, Cargo.toml, go.mod).",
+                    error="Couldn't find any code to fix in this zip. Zip the project folder "
+                    "(it can have a wrapper folder) and make sure it has source files or one of: "
+                    "package.json, requirements.txt/pyproject.toml, pom.xml, build.gradle, "
+                    "composer.json, pubspec.yaml, Cargo.toml, go.mod.",
                     final_status="failed",
                 )
                 return
@@ -474,7 +528,7 @@ def run_job(job_id: str, zip_bytes: bytes) -> None:
                 ]
 
             jobs.update_job(job_id, status="packaging")
-            result_zip = zip_directory(root)
+            result_zip = zip_directory(extracted_root)
             result_path = f"{job_id}/fixed.zip"
             _upload_to_storage(RESULT_BUCKET, result_path, result_zip, "application/zip")
 
