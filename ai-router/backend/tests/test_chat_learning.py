@@ -59,7 +59,7 @@ def test_unlearnable_questions(q):
 
 
 @pytest.mark.parametrize("a", ["Sorry, I can't help.", "I don't know the answer to that one really.",
-                               "As of my knowledge cutoff the answer was this and that.", "short",
+                               "As of my knowledge cutoff the answer was this and that.", "ok",
                                "See https://example.com for details about the answer.", "```code``` " * 5])
 def test_unlearnable_answers(a):
     assert not cl.is_learnable_answer(a)
@@ -148,3 +148,11 @@ def test_recording_failure_never_breaks_chat(monkeypatch):
     monkeypatch.setattr(cl, "record", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("disk full")))
     router, _ = make_router()
     assert ask(router, "what is the capital of France", "a")["reply"] == GOOD
+
+def test_short_factual_answers_are_learned_but_bare_yes_no_is_not():
+    assert cl.is_learnable_answer("Paris.")
+    assert cl.is_learnable_answer("Paris")
+    assert not cl.is_learnable_answer("Yes.")
+    assert not cl.is_learnable_answer("ok")
+    assert not cl.is_learnable_answer("")
+    assert not cl.is_learnable_answer("I don't know that one.")

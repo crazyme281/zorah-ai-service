@@ -43,6 +43,7 @@ _SELF = re.compile(r"\b(my|mine|myself|our|ours)\b|\bi\s*(am|have|had|got)\b|\bi
 _SENSITIVE = re.compile(r"password|passcode|\botp\b|\bpin\b|account number|card|\bssn\b|\bbvn\b|\bnin\b|salary|address|diagnos|prescri|symptom", re.I)
 _PII = re.compile(r"@|https?://|www\.|\d{5,}|\+\d")
 _CONTEXT = re.compile(r"\b(it|its|this|that|these|those|they|them|their|he|she|his|her|him|above|previous|earlier|again|the same|more about)\b", re.I)
+_TRIVIAL = re.compile(r"^\W*(yes|no|yeah|yep|nope|ok|okay|sure|maybe|true|false|fine|thanks|hello|hi)\W*$", re.I)
 _BAD_ANSWER = re.compile(r"as an ai|i don'?t know|i'?m not sure|i cannot|i can'?t|sorry|apolog|as of my|knowledge cutoff|you seem|you'?re feeling|i feel|real-?time|browse|search the web", re.I)
 
 
@@ -93,8 +94,9 @@ def question_problem(q: str) -> str | None:
 
 def answer_problem(a: str) -> str | None:
     a = (a or "").strip()
-    if not (30 <= len(a) <= 1500):
-        return "provider answer is too short or too long"
+    # Short factual answers are fine ("Paris."); a bare yes/no/ok is not a fact.
+    if not (3 <= len(a) <= 1500) or _TRIVIAL.match(a):
+        return "provider answer is empty, a bare yes/no, or too long"
     if "```" in a or _PII.search(a):
         return "answer has code, a link or personal data"
     if _BAD_ANSWER.search(a):
