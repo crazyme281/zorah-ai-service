@@ -12,13 +12,18 @@ shown to the user says in plain words what went wrong with each.
 """
 
 import json
+import os
 import re
 
 import requests
 
-from config import API_KEYS, MODELS, REQUEST_TIMEOUT
+from config import API_KEYS, MODELS
 
 PROVIDER_ORDER = ["gemini", "claude", "openai", "groq"]
+# Rewriting a whole project is far slower than a chat reply (a thinking model
+# can think for minutes first), so this has its own, much longer, timeout.
+# The job runs in the background; nobody is waiting on this one request.
+REQUEST_TIMEOUT = int(os.getenv("CODE_FIXER_AI_TIMEOUT", "240"))
 MAX_OUTPUT_TOKENS = 32768   # thinking models spend part of this before writing the answer
 
 SYSTEM_PROMPT = """You are a careful software engineer fixing a real, existing project.
@@ -94,6 +99,8 @@ def _friendly(err: str) -> str:
     low = err.lower()
     if "credit balance" in low:
         return "the account has no credits left - add credits in its billing page"
+    if "timed out" in low or "timeout" in low:
+        return f"took longer than {REQUEST_TIMEOUT} seconds to answer - the project may be too big for one pass"
     if "429" in low or "quota" in low or "rate limit" in low or "resource_exhausted" in low:
         return "rate limit or quota reached - try again in a minute"
     if "401" in low or "403" in low or "api key" in low or "permission" in low:

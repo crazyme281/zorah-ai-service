@@ -108,3 +108,18 @@ def test_no_keys_is_a_clear_error(monkeypatch):
     monkeypatch.setattr(ai, "API_KEYS", {})
     with pytest.raises(ai.CodeFixAIError, match="no AI provider is configured"):
         ai.propose_fixes("ctx")
+
+
+def test_timeout_is_long_and_reported_in_plain_words(keys, monkeypatch):
+    import requests
+    assert ai.REQUEST_TIMEOUT >= 180
+    seen = {}
+
+    def post(url, **kw):
+        seen["timeout"] = kw["timeout"]
+        raise requests.exceptions.ReadTimeout("HTTPSConnectionPool(host='x', port=443): Read timed out. (read timeout=60)")
+    monkeypatch.setattr(ai.requests, "post", post)
+    with pytest.raises(ai.CodeFixAIError) as e:
+        ai.propose_fixes("ctx")
+    assert seen["timeout"] == ai.REQUEST_TIMEOUT
+    assert "took longer than" in str(e.value) and "HTTPSConnectionPool" not in str(e.value)
