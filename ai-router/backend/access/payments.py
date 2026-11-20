@@ -33,6 +33,7 @@ TIER_PRICES_NGN = {
 }
 
 VERIFY_ENDPOINT = "https://api.flutterwave.com/v3/transactions/{transaction_id}/verify"
+PAYMENTS_ENDPOINT = "https://api.flutterwave.com/v3/payments"
 SUBSCRIPTION_PERIOD_DAYS = 30
 
 # A pending payment left unpaid shouldn't be checkoutable forever —
@@ -87,6 +88,53 @@ class FlutterwaveClient:
             currency=data.get("currency", ""),
             status=data.get("status", "unknown"),
         )
+
+
+    def create_payment_link(
+        self,
+        *,
+        tx_ref: str,
+        amount: float,
+        currency: str,
+        email: str,
+        redirect_url: str,
+        title: str,
+    ) -> str:
+        """
+        Creates a Flutterwave HOSTED checkout page and returns its URL.
+
+        The inline widget used on the website (checkout.flutterwave.com/v3.js)
+        depends on iframes, pop-ups and 3-D Secure redirects that an Android
+        WebView blocks, so the installed app can't complete it. A hosted page
+        opens in a normal browser tab instead and sends the customer back to
+        `redirect_url` when done.
+        """
+        payload = {
+            "tx_ref": tx_ref,
+            "amount": amount,
+            "currency": currency,
+            "redirect_url": redirect_url,
+            "payment_options": "card,banktransfer,ussd",
+            "customer": {"email": email},
+            "customizations": {"title": title, "description": "Zorah AI subscription"},
+        }
+        try:
+            resp = requests.post(
+                PAYMENTS_ENDPOINT,
+                json=payload,
+                headers={"Authorization": f"Bearer {self.secret_key}"},
+                timeout=20,
+            )
+        except requests.RequestException as e:
+            raise PaymentVerificationError(f"could not reach Flutterwave: {e}")
+
+        if resp.status_code >= 400:
+            raise PaymentVerificationError(f"Flutterwave checkout HTTP {resp.status_code}")
+
+        link = (resp.json().get("data") or {}).get("link")
+        if not link:
+            raise PaymentVerificationError("Flutterwave didn't return a checkout link")
+        return link
 
 
 def initiate_payment(user_id: str, tier: Tier) -> dict:
@@ -210,3 +258,41 @@ def upgrade_plan(
         "subscription_start": start.isoformat(),
         "subscription_expiration": expiration.isoformat(),
     }
+
+
+def create_hosted_checkout(
+    user_id: str,
+    tx_ref: str,
+    email: str,
+    redirect_url: str,
+    flutterwave: "FlutterwaveClient",
+) -> str:
+    """
+    Mobile-app counterpart to the inline widget. Looks up the pending row
+    that initiate_payment() wrote for THIS user and THIS tx_ref, and builds
+    the hosted checkout from the amount/currency stored there — never from
+    anything the client sends, so the price can't be tampered with.
+    """
+    pending = select(
+        "payments",
+        {
+            "tx_id": f"eq.{tx_ref}",
+            "user_id": f"eq.{user_id}",
+            "status": "eq.pending",
+            "select": "*",
+            "limit": "1",
+        },
+    )
+    if not pending:
+        raise PaymentVerificationError("no pending payment found for this account")
+    record = pending[0]
+    tier_label = {"GO": "Go", "PRO": "Pro"}.get(record["tier"], record["tier"])
+
+    return flutterwave.create_payment_link(
+        tx_ref=tx_ref,
+        amount=record["amount"],
+        currency=record["currency"],
+        email=email,
+        redirect_url=redirect_url,
+        title=f"Zorah AI — {tier_label}",
+    )

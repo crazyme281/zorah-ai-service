@@ -16,14 +16,20 @@ from typing import Any
 import requests
 from fastapi import BackgroundTasks, Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from router import AIRouter
 from emotion.engine import EmotionEngine
 from access.tiers import SubscriptionStore, Tier
 from access.image_policy import ImageStore, ImageQuotaExceeded
-from access.payments import FlutterwaveClient, PaymentVerificationError, upgrade_plan, initiate_payment
+from access.payments import (
+    FlutterwaveClient,
+    PaymentVerificationError,
+    upgrade_plan,
+    initiate_payment,
+    create_hosted_checkout,
+)
 from access import devices as device_links
 from access import apk as apk_releases
 from access.db import select
@@ -384,6 +390,11 @@ class InitiatePaymentRequest(BaseModel):
     tier: str  # "GO" or "PRO"
 
 
+class HostedCheckoutRequest(BaseModel):
+    tx_ref: str  # from /payments/initiate
+    email: str
+
+
 class VerifyPaymentRequest(BaseModel):
     tier: str  # "GO" or "PRO" — must match what was initiated
     transaction_id: str  # Flutterwave's own numeric id, from the checkout callback
@@ -429,6 +440,76 @@ def start_payment(req: InitiatePaymentRequest, user_id: str = Depends(require_us
         return initiate_payment(user_id, tier)
     except PaymentVerificationError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# Where the hosted checkout sends the customer back to. The mobile app
+# registers this scheme in AndroidManifest.xml (see PAYMENT_REDIRECT in
+# frontend/src/lib/nativePayment.ts — keep the two in sync).
+APP_PAYMENT_DEEP_LINK = "ai.zorah.app://payment/callback"
+
+
+def _public_base_url(request: Request) -> str:
+    """The backend's own public https URL. Set PUBLIC_BACKEND_URL on Render
+    if the auto-detected one is ever wrong."""
+    configured = os.getenv("PUBLIC_BACKEND_URL")
+    if configured:
+        return configured.rstrip("/")
+    base = str(request.base_url).rstrip("/")
+    if base.startswith("http://") and "localhost" not in base and "127.0.0.1" not in base:
+        base = "https://" + base[len("http://"):]
+    return base
+
+
+@app.post("/payments/hosted-link")
+def hosted_checkout_link(
+    req: HostedCheckoutRequest, request: Request, user_id: str = Depends(require_user)
+):
+    """Mobile app: returns a Flutterwave hosted-checkout URL for a payment
+    already created by /payments/initiate. The app opens it in a browser tab
+    (the inline widget can't run inside an Android WebView) and is brought
+    back through /payments/return -> the app's deep link."""
+    if flutterwave is None:
+        raise HTTPException(status_code=503, detail="payments not configured")
+    redirect_url = f"{_public_base_url(request)}/payments/return"
+    try:
+        link = create_hosted_checkout(user_id, req.tx_ref, req.email, redirect_url, flutterwave)
+    except PaymentVerificationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"link": link}
+
+
+@app.get("/payments/return", response_class=HTMLResponse)
+def payment_return(
+    status: str = "",
+    tx_ref: str = "",
+    transaction_id: str = "",
+):
+    """Flutterwave redirects the customer's browser here after paying. It
+    carries no secrets and grants nothing — it only hands the result to the
+    app, which then calls /payments/verify (the only step that can grant a
+    tier, after checking with Flutterwave directly)."""
+    from html import escape
+    from urllib.parse import urlencode
+
+    query = urlencode({"status": status, "tx_ref": tx_ref, "transaction_id": transaction_id})
+    target = f"{APP_PAYMENT_DEEP_LINK}?{query}"
+    safe = escape(target, quote=True)
+    page = f"""<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Returning to Zorah AI</title>
+<style>
+body{{margin:0;min-height:100vh;display:grid;place-items:center;background:#08080a;color:#f3ead2;
+font-family:system-ui,sans-serif;text-align:center;padding:24px}}
+a{{display:inline-block;margin-top:18px;padding:14px 26px;border-radius:999px;
+background:linear-gradient(135deg,#f5d77a,#c9972b);color:#1a1405;font-weight:600;text-decoration:none}}
+</style></head>
+<body><div><h2>Returning to Zorah AI&hellip;</h2>
+<p>If the app doesn&rsquo;t open on its own, tap the button.</p>
+<a href="{safe}">Open Zorah AI</a></div>
+<script>setTimeout(function(){{window.location.href={json.dumps(target)};}},150);</script>
+</body></html>"""
+    return HTMLResponse(page)
 
 
 @app.post("/images/authorize")
